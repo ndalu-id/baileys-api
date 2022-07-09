@@ -1,0 +1,48 @@
+html, body {
+    margin: 0 0 0 0;
+}
+#wrapper {
+    padding-top: 80px;
+    margin-bottom: 20px;
+}
+#pre {
+    background-color: black;
+    color: white;
+    padding: 10px 10px 10px 10px;
+}
+#qrcode-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+div {
+    margin-top: 5px
+}
+nav {
+    padding: 20px 20px 20px 20px;
+    background-color: rgba(0,0,0,0.1);
+    width: 100%;
+    position: fixed;
+    top: 0;
+}
+nav ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+nav ul li {
+    display: inline;
+    padding: 0px 10px 0px 10px;
+}
+nav ul li.active {
+    background-color: black !important;
+    padding: 10px 10px 10px 10px;
+}
+nav ul li a {
+    text-decoration: none;
+    font-weight: bold;
+}
+nav ul li a.active {
+    color: white;
+}

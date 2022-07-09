@@ -217,16 +217,7 @@ const connectToWhatsApp = async (token, io) => {
 
         if ( lastDisconnect?.error) {
             console.log(lastDisconnect.error)
-            clearInterval(intervalStore[token])
-            delete sock[token]
-            delete qrcode[token]
-            fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
-                if (err) {
-                    throw err;
-                }
-                console.log(`credentials/${token} is deleted`);
-            });
-            io.emit('message', {token: token, message: lastDisconnect})
+            io.emit('message', {token: token, message: "Error", error: lastDisconnect})
         }
         // console.log('connection update', update)
     })

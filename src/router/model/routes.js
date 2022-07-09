@@ -14,7 +14,7 @@ const createInstance = async (req, res) => {
             return res.send({
                 status: status,
                 qrcode: connect?.qrcode,
-                message: message
+                message: message ? message : 'Processing'
             })
         } catch (error) {
             console.log(error)

@@ -21,5 +21,15 @@
   "main": "index.js",
   "repository": "https://github.com/ndalu-id/baileys-express",
   "author": "ndalu-id <tofiknuryanto@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "dev-win": "set NODE_ENV=development&&nodemon src/index",
+    "dev": "NODE_ENV=development node src/index",
+    "start": "NODE_ENV=production node src/index"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "credentials/*"
+    ]
+  }
 }

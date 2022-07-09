@@ -1,6 +1,23 @@
-![wa.ndalu.id!](https://wa.ndalu.id/favicon.png "Tofik Nuryanto")
-
 # Ndalu-wa-client
+
+![Wa.ndalu.id!](https://wa.ndalu.id/favicon.png "Tofik Nuryanto")
+
+    BASED REPO : {
+        "@adiwajshing/baileys": "^4.2.0",
+        "@adiwajshing/keyed-db": "^0.2.4",
+        "axios": "^0.27.2",
+        "body-parser": "^1.20.0",
+        "crypto-js": "^4.1.1",
+        "dotenv": "^16.0.1",
+        "express": "^4.18.1",
+        "link-preview-js": "^2.1.19",
+        "pino": "^8.1.0",
+        "pino-pretty": "^8.1.0",
+        "qrcode": "^1.5.0",
+        "qrcode-terminal": "^0.12.0",
+        "sharp": "^0.30.7",
+        "socket.io": "^4.5.1"
+    }
 
 Whatsapp API based on baileys.
 Demo visit here [wa.ndalu.id](https://wa.ndalu.id)

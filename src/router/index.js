@@ -13,10 +13,18 @@ const validation = process.env.AUTH
 
 // sendFile will from here. Delete or comment if no use anymore
 router.get('/', (req, res) => {
-
     const path = require('path')
     res.sendFile(path.join(__dirname, '../public/index.html'));
+})
 
+router.get('/check-emit', (req, res) => {
+    const path = require('path')
+    res.sendFile(path.join(__dirname, '../public/check-emit.html'));
+})
+
+router.get('/docs', (req, res) => {
+    const path = require('path')
+    res.sendFile(path.join(__dirname, '../public/docs.html'));
 })
 
 // Check headers post from your PHP backend, don't forget to get

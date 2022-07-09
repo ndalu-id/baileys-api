@@ -4,25 +4,10 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-
-    <style>
-        html, body {
-            margin: 0 0 0 0;
-        }
-        body {
-            padding: 10px 10px 10px 10px;
-        }
-        #pre {
-            background-color: black;
-            color: white;
-            padding: 10px 10px 10px 10px;
-        }
-        #qrcode-container {
-            display: flex;
-            justify-content: center;
-        }
-    </style>
+    <title>Home</title>
+    <link rel="icon" href="/favicon.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/global.css">
 
     <!-- SOCKET.IO -->
     <!-- Check the server url to replace this -->
@@ -33,105 +18,193 @@
 
 </head>
 <body>
+
+    <nav>
+        <ul>
+            <li class="active">
+                <a href="/" class="active">home</a>
+            </li>
+            <li>
+                <a href="/check-emit">check-emit</a>
+            </li>
+            <li>
+                <a href="/docs">docs</a>
+            </li>
+        </ul>
+    </nav>
     
-<!-- THIS INPUT IS FOR POST TOKEN -->
-<form id="token-form">
-    This input is for post the Token
-    <br />
-    <input type="text" name="token">
-    <input type="submit" name="submit">
-    <br />
-    <label for="">TOKEN</label>
-    <br />
-    <!-- YOU MUST PROVIDE THE TOKEN ON YOUR CLIENT SIDE, TO CHECK THE OWNER OF THE QRCODE, USE URL PARAMETER, QUERYSTRING, SESSIO OR JSONWEBOKEN AS DEFAULT VALUE-->
-    <input id="token" type="text" placeholder="verified by token" disabled>
-</form>
+    <div id="wrapper" class="container-fluid row">
+        <div class="col-md-6">
+            <form id="token-form">
+                <div>
+                    This input is for post the Token, create your own token
+                    <br />
+                    <input type="text" name="token" value="test" class="form-control mb-2">
+                    <button type="submit" name="submit" class="btn btn-sm btn-primary">CONNECT</button>
+                    <button type="button" name="delete" class="btn btn-sm btn-danger delete-token">delete</button>
+                </div>
+                <div>
+                    <label for="">When instance is created, token will show in here.</label>
+                    <br />
+                    <!-- YOU MUST PROVIDE THE TOKEN ON YOUR CLIENT SIDE, TO CHECK THE OWNER OF THE QRCODE, USE URL PARAMETER, QUERYSTRING, SESSIO OR JSONWEBOKEN AS DEFAULT VALUE-->
+                    <input id="token" type="text" value="test" placeholder="verified by token" class="form-control" disabled>
+                </div>
+                <!-- TRIAL SEND MESSAGE -->
+                <div id="form-send" style="display: block;">
+                    FORM SEND MESSAGE.
+                    <br />
+                    Use 00000@s.whatsapp.net
+                    <br />
+                    <input name="number" class="number form-control" style="margin-top: 5px;" placeholder="000000@s.whatsapp.net" />
+                    <br />
+                    <textarea rows="5" class="message form-control" style="margin-top: 5px;" placeholder="sample message"></textarea>
+                    <br />
+                    <button class="send-message btn btn-success" type="button" onclick="sendMessage()">send</button>
+                </div>
+            </form>
+        </div>
 
-<!-- SAMPLE IMAGE TO GENERATE QRCODE -->
-<div id="qrcode-container">
-    <img id="qrcode" src="https://ndalu.id/favicon.png" alt="">
-</div>
-
-<!-- THIS JUST PRE FOR SHOWING THE JSON FROM SERVER -->
-<pre id="pre">{
+        <div class="col-md-6">
+            <!-- SAMPLE IMAGE TO GENERATE QRCODE -->
+            <div id="qrcode-container">
+                <img id="qrcode" src="https://ndalu.id/favicon.png" alt="">
+            </div>
+        </div>
+    
+    </div>
+    <!-- THIS JUST PRE FOR SHOWING THE JSON FROM SERVER -->
+    <pre id="pre">{
     message: "Here all the json will show"
 }</pre>
+    
+    <!-- THIS INPUT IS FOR POST TOKEN -->
 
-<script>
+    <script>
 
-    // prompter optional
-    const pre = document.querySelector('#pre')
-    // element token or your PHP session/database token
-    const checkToken = document.querySelector('#token')
-    // element image
-    const qrcode = document.querySelector('#qrcode')
-    // element post or when the button hit to post create-instance
-    const form = document.querySelector('#token-form')
-    if ( form ) form.addEventListener('submit', async (e) => {
-        e.preventDefault()
-        const token = document.querySelector('input[name="token"]')
-        if (token.value) {
-            checkToken.value = token.value
-            const req = await fetch('/api/whatsapp/create-instance', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' // don'texpo
-                },
-                body: JSON.stringify({token: token.value})
-            })
-            // result as json
-            const res = await req.json()
-            if (res.qrcode) { // if result has qrcode
-                qrcode.src = res.qrcode // set element image src to res.qrcode
+        // prompter optional
+        const pre = document.querySelector('#pre')
+        // element token or your PHP session/database token
+        const checkToken = document.querySelector('#token')
+        // element image
+        const qrcode = document.querySelector('#qrcode')
+        // element post or when the button hit to post create-instance
+        const form = document.querySelector('#token-form')
+        if ( form ) form.addEventListener('submit', async (e) => {
+            e.preventDefault()
+            document.querySelector('#form-send').setAttribute('style', 'block')
+            const token = document.querySelector('input[name="token"]')
+            if (token.value) {
+                checkToken.value = token.value
+                const req = await fetch('/api/whatsapp/create-instance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' // don'texpo
+                    },
+                    body: JSON.stringify({token: token.value})
+                })
+                // result as json
+                const res = await req.json()
+                if (res.qrcode) { // if result has qrcode
+                    qrcode.src = res.qrcode // set element image src to res.qrcode
+                }
+                // diplay result to prompter
+                return pre.innerHTML = JSON.stringify(res, undefined, 2)
             }
-            // diplay result to prompter
-            return pre.innerHTML = JSON.stringify(res, undefined, 2)
-        }
-        pre.innerHTML = JSON.stringify({message: 'Token must not be empty'}, undefined, 2)
-    })
+            pre.innerHTML = JSON.stringify({message: 'Token must not be empty'}, undefined, 2)
+        })
 
-    // CONSUME SOCKET IO CLIENT SIDE START
-    // to receiving message from server
-    socket.on('message', (data) => {
-        // Check if token is same with te data.token, show the qrcode
-        if (data.token === checkToken.value) { // remove if you want to watching entire connection
-            console.log(data)
-            pre.innerHTML = JSON.stringify(data, undefined, 2)
-            if (data.message.error) {
+        // delete token / delete instance
+        const deleteToken = document.querySelector('.delete-token')
+        if ( deleteToken ) deleteToken.addEventListener('click', async () => {
+            if ( checkToken.value ) {
+                const req = await fetch('/api/whatsapp/delete-credential', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg=='
+                    },
+                    body: JSON.stringify({token: checkToken.value})
+                })
+                const res = await req.json()
+                pre.innerHTML = JSON.stringify(res, undefined, 2)
                 qrcode.src = "https://ndalu.id/favicon.png"
+            } else {
+                pre.innerHTML = JSON.stringify({
+                    message: 'Cannot delete empty token'
+                }, undefined, 2)
+            }
+        })
+
+        // TRIAL SEND MESSAGE
+        async function sendMessage() {
+            const number = document.querySelector('.number')
+            const message = document.querySelector('.message')
+            if ( number.value.endsWith('@s.whatsapp.net') && message.value) {
+                const dataPost = {
+                    token: checkToken.value,
+                    number: number.value,
+                    text: message.value
+                }
+                const req = await fetch('/api/whatsapp/send-text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg=='
+                    },
+                    body: JSON.stringify(dataPost)
+                })
+                const res = await req.json()
+                if (res.status) {
+                    message.value = ''
+                    pre.innerHTML = JSON.stringify(res, undefined, 2)
+                }
+            } else {
+                alert('Number must end with @s.whatsapp.net')
             }
         }
-    })
 
-    // to receiving whatsapp message from server ( watching whatsapp activity like receiving message, sending message, status@broadcast etc)
-    socket.on('message-upsert', (data) => {
-        // Check if token is same with te data.token, show the qrcode
-        if (data.token === checkToken.value) { // remove if you want to watching entire connection
-            pre.innerHTML = JSON.stringify(data, undefined, 2)
-        }
-    })
+        // CONSUME SOCKET IO CLIENT SIDE START
+        // to receiving message from server
+        socket.on('message', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // remove if you want to watching entire connection
+                console.log(data)
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+                if (data.message.error) {
+                    qrcode.src = "https://ndalu.id/favicon.png"
+                }
+            }
+        })
 
-    // to receiving qrcode when starting connection
-    socket.on('qrcode', (data) => {
-        // Check if token is same with te data.token, show the qrcode
-        if (data.token === checkToken.value) { // Don't remove or you will confuse if at the same time other people is request a qrcode too
-            qrcode.src = data.data
-            pre.innerHTML = JSON.stringify(data, undefined, 2)
-        }
-    })
+        // to receiving whatsapp message from server ( watching whatsapp activity like receiving message, sending message, status@broadcast etc)
+        socket.on('message-upsert', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // remove if you want to watching entire connection
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+            }
+        })
 
-    // when connection open, show the user and ppUrl
-    socket.on('connection-open', (data) => {
-        // Check if token is same with te data.token, show the qrcode
-        if (data.token === checkToken.value) { // remove if you want to watching entire connection
-            pre.innerHTML = JSON.stringify(data, undefined, 2)
-            qrcode.src = data.ppUrl
-        }
-    })
-    // CONSUME SOCKET IO CLIENT SIDE END
+        // to receiving qrcode when starting connection
+        socket.on('qrcode', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // Don't remove or you will confuse if at the same time other people is request a qrcode too
+                qrcode.src = data.data
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+            }
+        })
 
-</script>
+        // when connection open, show the user and ppUrl
+        socket.on('connection-open', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // remove if you want to watching entire connection
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+                qrcode.src = data.ppUrl
+            }
+        })
+        // CONSUME SOCKET IO CLIENT SIDE END
+
+    </script>
 
 </body>
 </html>

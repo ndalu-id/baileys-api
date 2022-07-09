@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emit</title>
+    <link rel="icon" href="/favicon.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/global.css">
+
+    <!-- SOCKET.IO -->
+    <!-- Check the server url to replace this -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io()
+    </script>
+
+</head>
+<body>
+
+    <nav>
+        <ul>
+            <li>
+                <a href="/">home</a>
+            </li>
+            <li class="active">
+                <a href="/check-emit" class="active">check-emit</a>
+            </li>
+            <li>
+                <a href="/docs">docs</a>
+            </li>
+        </ul>
+    </nav>
+    
+    <div id="token-form"></div>
+    
+    <!-- SAMPLE IMAGE TO GENERATE QRCODE -->
+    <div id="wrapper" class="container-fluid row">
+        <div class="col-md-6">
+            <!-- SAMPLE IMAGE TO GENERATE QRCODE -->
+            <div id="qrcode-container">
+                <img id="qrcode" src="https://ndalu.id/favicon.png" alt="">
+            </div>
+        </div>
+        <div class="col-md-6">
+            <!-- THIS JUST PRE FOR SHOWING THE JSON FROM SERVER -->
+        <pre id="pre">{
+    message: "Here all the json will show"
+}</pre>
+        </div>
+    </div>
+
+    <script>
+
+        // prompter optional
+        const pre = document.querySelector('#pre')
+
+        // element image
+        const qrcode = document.querySelector('#qrcode')
+
+        let arr = []
+
+        // CHECK EMIT
+        // to receiving message from server
+        socket.on('message', (data) => {
+            arr.push(data)
+            pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
+            if (data.message.error) {
+                qrcode.src = "https://ndalu.id/favicon.png"
+            }
+        })
+
+        // to receiving whatsapp message from server ( watching whatsapp activity like receiving message, sending message, status@broadcast etc)
+        socket.on('message-upsert', (data) => {
+            arr.push(data)
+            pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
+        })
+
+        // to receiving qrcode when starting connection
+        socket.on('qrcode', (data) => {
+            arr.push(data)
+            pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
+            qrcode.src = data.data
+        })
+
+        // when connection open, show the user and ppUrl
+        socket.on('connection-open', (data) => {
+            arr.push(data)
+            pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
+            qrcode.src = data.ppUrl
+        })
+        // CONSUME SOCKET IO CLIENT SIDE END
+
+    </script>
+
+</body>
+</html>

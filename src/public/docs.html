@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docs</title>
+    <link rel="icon" href="/favicon.jpg">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/global.css">
+
+    <!-- SOCKET.IO -->
+    <!-- Check the server url to replace this -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io()
+    </script>
+
+</head>
+<body>
+
+    <nav>
+        <ul>
+            <li>
+                <a href="/">home</a>
+            </li>
+            <li>
+                <a href="/check-emit">check-emit</a>
+            </li>
+            <li class="active">
+                <a href="/docs" class="active">docs</a>
+            </li>
+        </ul>
+    </nav>
+    
+    <div id="wrapper">
+        <div id="qrcode-container">
+            <img id="qrcode" src="https://ndalu.id/favicon.png" alt="">
+        </div>
+    </div>
+
+    <div style="text-align: center;">Please read the README.md file or <a href="https://github.com/ndalu-id/baileys-api">github page</a></div>
+
+</body>
+</html>

@@ -1,5 +1,18 @@
 'use strict'
 
+const fs = require('fs')
+// check .env config
+if ( !fs.existsSync('.env') ) {
+    console.log('----------\n> env is not found\n> EXITED\n----------')
+    process.exit(0)
+}
+// check folder credentials
+if ( !fs.existsSync('credentials') ) {
+    console.log('----------\n> credentials folder is not found\n----------')
+    fs.mkdirSync('credentials')
+    console.log('----------\n> credentials folder is created\n----------')
+}
+
 require('dotenv').config()
 const lib = require('./lib')
 global.log = lib.log
@@ -50,9 +63,9 @@ app.use(bodyParser.urlencoded({ extended: false }))
 // parse application/json
 app.use(bodyParser.json())
 
+app.use(express.static('src/public'))
 app.use(require('./router'))
 
-app.use(express.static('src/public'))
 app.get('/*', (req, res) => {
     res.status(404).end('404 - PAGE NOT FOUND')
 })
