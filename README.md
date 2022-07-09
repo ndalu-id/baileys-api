@@ -65,6 +65,7 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
     TO START DEVELOPER MODE
     WINDOWS: yarn win-dev
     LINUX: yarn dev
+    VISIT: http://localhost:3000
 
     TO START production MODE
     WINDOWS: yarn win-start
