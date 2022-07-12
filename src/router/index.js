@@ -8,6 +8,7 @@ const router = express.Router()
  */
 const wa = require('./model/routes')
 const store = require('./model/store')
+const scheduler = require('./model/scheduler')
 const CryptoJS = require("crypto-js")
 const validation = process.env.AUTH
 
@@ -62,6 +63,12 @@ router.post('/api/whatsapp/get-profile-picture', wa.getPpUrl)
 router.post('/api/whatsapp/delete-for-every-one', wa.deleteEveryOne)
 router.post('/api/whatsapp/group-metadata', wa.groupMetadata)
 router.post('/api/whatsapp/delete-credential', wa.deleteCredentials)
+
+// STORE
 router.post('/api/whatsapp/store/chats', store.chats)
+
+// SCHEDULER
+router.post('/api/whatsapp/scheduler', scheduler.getScheduler)
+router.post('/api/whatsapp/scheduler/add-scheduler', scheduler.addScheduler)
 
 module.exports = router

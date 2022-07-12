@@ -75,6 +75,7 @@ server.listen(port, log.info(`Server run and listening port: ${port}`))
 function autostartInstance() {
 
     const wa = require('./router/model/whatsapp')
+    const scheduler = require('./router/model/scheduler')
 
     // looking for credentials saved
     const fs = require('fs')
@@ -90,6 +91,7 @@ function autostartInstance() {
         setTimeout(async() => {
             lib.log.info(`Reconnecting session ${token[i]}`)
             await wa.connectToWhatsApp(token[i], io).catch(err => lib.log.error(err))
+            scheduler.autostartScheduler(token[i])
         }, delay)
     }
 

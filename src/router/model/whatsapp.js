@@ -215,10 +215,10 @@ const connectToWhatsApp = async (token, io) => {
             delete qrcode[token]
         }
 
-        if ( lastDisconnect?.error) {
-            console.log(lastDisconnect.error)
-            io.emit('message', {token: token, message: "Error", error: lastDisconnect})
-        }
+        // if ( lastDisconnect?.error) {
+        //     console.log(lastDisconnect.error)
+        //     io.emit('message', {token: token, message: "Error", error: lastDisconnect})
+        // }
         // console.log('connection update', update)
     })
     
@@ -501,6 +501,7 @@ async function groupMetadata(token, number) {
 function deleteCredentials(token) {
     try {
         delete sock[token]
+        delete qrcode[token]
         clearInterval(intervalStore[token])
         fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
             if (err) {

@@ -11,24 +11,36 @@
         "dotenv": "^16.0.1",
         "express": "^4.18.1",
         "link-preview-js": "^2.1.19",
+        "node-cron": "^3.0.1",
         "pino": "^8.1.0",
         "pino-pretty": "^8.1.0",
         "qrcode": "^1.5.0",
         "qrcode-terminal": "^0.12.0",
         "sharp": "^0.30.7",
-        "socket.io": "^4.5.1"
+        "socket.io": "^4.5.1",
+        "uuid": "^8.3.2"
     }
 
 Whatsapp API based on baileys.
 Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
+## TODO
+
+    - do type and data post to add scheduler
+    - do update scheduler.json
+    - do reload cron every update scheduler
+
 ## UPDATE
 
-    Baileys nolonger using useSingeFileAuthState, now using useMultiFileAuthState.
-    Script updated using last baileys documentation.
+Baileys nolonger using useSingeFileAuthState, now using useMultiFileAuthState. Script updated using last baileys documentation.
 
-    credential and store will saved in the credentials file.
-    Still not trying much, maybe have a bug. Not already checked for more details during my activity.
+Credential and store will saved in the credentials file. Still not trying much, maybe have a bug. Not already checked for more details during my activity.
+
+Scheduler messages using node-cron (User must know about cronjob to managing time scheduler) [crontab](https://crontab.guru/)
+
+When node-cron have Error: Cannot find module 'uuid'
+
+    yarn add uuid
 
 ## EMIT LIST
 
@@ -703,3 +715,59 @@ Share
 [Donation](https://paypal.me/tofiknuryanto)
 
 Still updating every have a break time from my activity
+
+## GET SCHEDULER
+
+    curl --location --request POST 'localhost:3000/api/whatsapp/scheduler' \
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' \
+    --data-raw '{
+        "token": "sometoken"
+    }'
+
+    RESPONSE
+    {
+        "status": true,
+        "data": [
+            {
+                "type": "sendText",
+                "data": {
+                    "number": "6285640465672@s.whatsapp.net",
+                    "text": "scheduler text"
+                },
+                "time": "58 11 * * *"
+            },
+            {
+                "type": "sendText",
+                "data": {
+                    "number": "6285640465672@s.whatsapp.net",
+                    "text": "scheduler text"
+                },
+                "time": "58 11 * * *"
+            }
+        ]
+    }
+
+## ADD SCHEDULER
+
+    curl --location --request POST 'localhost:3000/api/whatsapp/scheduler/add-scheduler' \
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' \
+    --data-raw '{
+        "token": "test",
+        "type": "sendText",
+        "data": {
+            "number": "000000@s.whatsapp.net",
+            "text": "Pesan otomatis"
+        },
+        "time": "05 12 * * *"
+    }'
+
+    type : ['on update']
+    data: ['on update']
+
+    RESPONSE
+    {
+        "status": true,
+        "data": [...data-cron]
+    }
