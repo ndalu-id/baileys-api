@@ -706,16 +706,6 @@ When node-cron have Error: Cannot find module 'uuid'
         }
     ]
 
-Please Fork
-
-Star :star:
-
-Share
-
-[Donation](https://paypal.me/tofiknuryanto)
-
-Still updating every have a break time from my activity
-
 ## GET SCHEDULER
 
     curl --location --request POST 'localhost:3000/api/whatsapp/scheduler' \
@@ -771,3 +761,15 @@ Still updating every have a break time from my activity
         "status": true,
         "data": [...data-cron]
     }
+
+## SUPPORT
+
+Please Fork
+
+Star :star:
+
+Share
+
+[Donation](https://paypal.me/tofiknuryanto)
+
+Still updating every have a break time from my activity
