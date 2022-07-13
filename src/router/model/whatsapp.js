@@ -76,16 +76,18 @@ const connectToWhatsApp = async (token, io) => {
 
     sock[token] = makeWASocket({
         version,
+        browser: ['Linux', 'Chrome', '103.0.5060.114'],
         logger,
         printQRInTerminal: true,
         auth: state,
         msgRetryCounterMap,
         // implement to handle retries
-        getMessage: async key => {
-            return {
-                conversation: 'hello'
-            }
-        }
+        getMessage: (AnyMessageContent) => Promise(AnyMessageContent || undefined)
+        // getMessage: async key => {
+        //     return {
+        //         conversation: 'hello'
+        //     }
+        // }
     })
 
     store?.bind(sock[token].ev)

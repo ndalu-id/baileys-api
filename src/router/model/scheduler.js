@@ -4,6 +4,8 @@ const fs = require('fs')
 const cron = require('node-cron')
 const whatsapp = require('../model/whatsapp')
 
+let schedule = []
+
 const getScheduler = (req, res) => {
     const { token } = req.body
 
@@ -19,22 +21,44 @@ const getScheduler = (req, res) => {
 }
 
 const addScheduler = (req, res) => {
-    const { token, type, data, time } = req.body
-    if ( token, type, data, time ) {
-
-        startScheduler(token, time, type, data)
+    const { token, id, type, data, time } = req.body
+    if ( token, id, type, data, time ) {
 
         let json = getJsonScheduler(token)
         if ( json.length > 0 ) {
-            json.push({type, data, time})
+            const check = json.filter(x => x.id == id)
+            if ( check.length > 0 ) return res.send({status: false, error: `Duplicate ID: ${id}`})
+            json.push({id, type, data, time})
         } else {
-            json = [{type, data, time}]
+            json = [{id, type, data, time}]
         }
-
+        startScheduler(token, id, time, type, data)
         const result = writeJsonScheduler(token, json)
         return res.send({status: true, data: result})
     }
     res.send({status: false, error: 'wrong parameters'})
+}
+
+const stopScheduler = (req, res) => {
+    const { token, id } = req.body
+    if ( token && id ) {
+        // console.log({token, id})
+        let json = getJsonScheduler(token)
+        const check = json.filter(x => x.id == id)
+        if ( check.length == 0 ) return res.send({status: false, message: `ID: ${id} Not Found`})
+        json.forEach( (x, i) => {
+            if ( x.id == id) {
+                json.splice(i, 1)
+            }
+        })
+        writeJsonScheduler(token, json)
+        if ( typeof schedule[token+'-'+id] !== 'undefined' ) {
+            schedule[token+'-'+id].stop()
+            return res.send({ status: true, message: `Scheduler ID: ${id} has been stopped` })
+        }
+        return res.send({ status: false, message: `Cannot stop scheduler if the scheduler not running`})
+    }
+    res.send({ status: false, message: "wrong parameters" })
 }
 
 function getJsonScheduler(token) {
@@ -51,8 +75,8 @@ function writeJsonScheduler(token, json) {
     return getJsonScheduler(token)
 }
 
-function startScheduler(token, time, type, data) {
-    cron.schedule(time, () => {
+function startScheduler(token, id, time, type, data) {
+    schedule[token+'-'+id] = cron.schedule(time, () => {
         if ( type == 'sendText') {
             whatsapp.sendText(token, data.number, data.text)
         }
@@ -62,12 +86,13 @@ function startScheduler(token, time, type, data) {
 function autostartScheduler(token) {
     const json = getJsonScheduler(token)
     json.forEach( x => {
-        startScheduler(token, x.time, x.type, x.data)
+        startScheduler(token, x.id, x.time, x.type, x.data)
     });
 }
 
 module.exports = {
     getScheduler,
     addScheduler,
-    autostartScheduler
+    autostartScheduler,
+    stopScheduler
 }

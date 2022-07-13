@@ -744,6 +744,7 @@ When node-cron have Error: Cannot find module 'uuid'
     --header 'Content-Type: application/json' \
     --header 'Authorization: Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' \
     --data-raw '{
+        "id": 1, // uniq id. Will be saved into scheduler.js. When system restarted this data will auto executed by node-cron
         "token": "test",
         "type": "sendText",
         "data": {
@@ -760,6 +761,22 @@ When node-cron have Error: Cannot find module 'uuid'
     {
         "status": true,
         "data": [...data-cron]
+    }
+
+## STOP SCHEDULER
+
+    curl --location --request POST 'localhost:3000/api/whatsapp/scheduler/stop-scheduler' \
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' \
+    --data-raw '{
+        "id": 1, // this id will stopped and deleted from scheduler.js. When system restarted node-cron not run it again
+        "token": "test",
+    }'
+
+    RESPONSE
+    {
+        "status": true || false,
+        "message": [Message status success or failed]
     }
 
 ## SUPPORT

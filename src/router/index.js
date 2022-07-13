@@ -70,5 +70,6 @@ router.post('/api/whatsapp/store/chats', store.chats)
 // SCHEDULER
 router.post('/api/whatsapp/scheduler', scheduler.getScheduler)
 router.post('/api/whatsapp/scheduler/add-scheduler', scheduler.addScheduler)
+router.post('/api/whatsapp/scheduler/stop-scheduler', scheduler.stopScheduler)
 
 module.exports = router

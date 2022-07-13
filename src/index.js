@@ -70,6 +70,8 @@ app.get('/*', (req, res) => {
     res.status(404).end('404 - PAGE NOT FOUND')
 })
 
+// console.log(process.argv)
+
 server.listen(port, log.info(`Server run and listening port: ${port}`))
 
 function autostartInstance() {
