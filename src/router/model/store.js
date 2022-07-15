@@ -25,7 +25,7 @@ const chats = (req, res) => {
                 return res.send({status: false, message: "Unknown type"})
             }
             if ( typeof json === 'undefined') return res.send({status: false, message: 'Data Not Found'})
-            return res.send(json.reverse())
+            return res.send( json.length > 0 ? json.reverse() : json )
         } catch (error) {
             process.env.NODE_ENV !== 'production' ? console.log(error) : null
             return res.send({status: false, error: error})

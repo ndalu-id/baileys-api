@@ -671,7 +671,8 @@ Emit message when request time out
 
     RESPONSE "messages"
     {
-        ... [all messages will displayed here]
+        "status@broadcast": [...{key, message, messageTimestamp, pushName}],
+        "0000000@s.whatsapp.net": [...{key, message, messageTimestamp, pushName}]
     }
 
     RESPONSE "messages" WITH "jid"
