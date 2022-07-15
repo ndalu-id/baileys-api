@@ -28,10 +28,11 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
     - do update scheduler.json ✔️
     - do reload cron every update scheduler ✔️
-    - do type and data post to add scheduler 🔥
-    - download media 🔥
-    - group API 🔥
-    - Should I share or create new FRONT END? 🔥🔥🔥🔥
+    - do type and data post to add scheduler 🔥🔥🔥
+    - download media 🔥🔥🔥
+    - group API 🔥🔥🔥
+    - Should I share or create new FRONT END? 🔥🔥
+    - Optional using STORE or not. You can use your own data store (own database) 🔥🔥
 
 ## UPDATE
 
@@ -711,6 +712,14 @@ Emit message when request time out
             "status": "PENDING"
         }
     ]
+
+## IMPLEMENTING A DATA STORE
+
+As mentioned earlier, Baileys does not come with a defacto storage for chats, contacts, messages. However, a simple in-memory implementation has been provided. The store listens for chat updates, new messages, message updates etc. to always have an up to date version of the data.
+
+The store also provides some simple functions such as loadMessages that utilize the store to speed up data retrieval.
+
+Note: I highly recommend building your own data store especially for MD connections, as storing someone's entire chat history in memory is a terrible waste of RAM. Connecting, deleting credential, connecting again will make your MD store mess up and last store will gone.
 
 ## GET SCHEDULER
 
