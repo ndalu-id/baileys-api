@@ -2,6 +2,7 @@
 
 const fs = require('fs')
 const cron = require('node-cron')
+const logger = require('../../lib/pino')
 const whatsapp = require('../model/whatsapp')
 
 let schedule = []
@@ -84,10 +85,14 @@ function startScheduler(token, id, time, type, data) {
 }
 
 function autostartScheduler(token) {
-    const json = getJsonScheduler(token)
-    json.forEach( x => {
-        startScheduler(token, x.id, x.time, x.type, x.data)
-    });
+    try {
+        const json = getJsonScheduler(token)
+        json.forEach( x => {
+            startScheduler(token, x.id, x.time, x.type, x.data)
+        });
+    } catch (error) {
+        logger.info(`Scheduler ${token} not found`)
+    }
 }
 
 module.exports = {

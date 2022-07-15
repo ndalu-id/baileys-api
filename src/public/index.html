@@ -171,7 +171,7 @@
             if (data.token === checkToken.value) { // remove if you want to watching entire connection
                 console.log(data)
                 pre.innerHTML = JSON.stringify(data, undefined, 2)
-                if (data.message.error) {
+                if (data.error) {
                     qrcode.src = "https://ndalu.id/favicon.png"
                 }
             }
@@ -196,6 +196,16 @@
 
         // when connection open, show the user and ppUrl
         socket.on('connection-open', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // remove if you want to watching entire connection
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+                qrcode.src = data.ppUrl
+            }
+        })
+        // CONSUME SOCKET IO CLIENT SIDE END
+
+        // when connection open, show the user and ppUrl
+        socket.on('error', (data) => {
             // Check if token is same with te data.token, show the qrcode
             if (data.token === checkToken.value) { // remove if you want to watching entire connection
                 pre.innerHTML = JSON.stringify(data, undefined, 2)

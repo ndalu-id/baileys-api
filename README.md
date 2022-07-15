@@ -2,7 +2,7 @@
 
 ![Wa.ndalu.id!](https://wa.ndalu.id/favicon.png "Tofik Nuryanto")
 
-    BASED REPO : {
+    DEPENDENCIES : {
         "@adiwajshing/baileys": "^4.2.0",
         "@adiwajshing/keyed-db": "^0.2.4",
         "axios": "^0.27.2",
@@ -26,9 +26,12 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## TODO
 
-    - do type and data post to add scheduler
-    - do update scheduler.json
-    - do reload cron every update scheduler
+    - do update scheduler.json ✔️
+    - do reload cron every update scheduler ✔️
+    - do type and data post to add scheduler 🔥
+    - download media 🔥
+    - group API 🔥
+    - Should I share or create new FRONT END? 🔥🔥🔥🔥
 
 ## UPDATE
 
@@ -41,6 +44,8 @@ Scheduler messages using node-cron (User must know about cronjob to managing tim
 When node-cron have Error: Cannot find module 'uuid'
 
     yarn add uuid
+
+Emit message when request time out
 
 ## EMIT LIST
 
@@ -788,5 +793,7 @@ Star :star:
 Share
 
 [Donation](https://paypal.me/tofiknuryanto)
+
+[Ask me on telegram (if not busy)](https://t.me/ndaludotid)
 
 Still updating every have a break time from my activity

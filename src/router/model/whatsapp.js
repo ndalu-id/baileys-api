@@ -17,7 +17,6 @@ const axios = require('axios')
 /***********************************************************
  * FUNCTION
  **********************************************************/
-
 //  import { Boom } from '@hapi/boom'
 //  import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBaileysVersion, makeInMemoryStore, MessageRetryMap, useMultiFileAuthState } from '../src'
  const MAIN_LOGGER = require('../../lib/pino')
@@ -25,15 +24,13 @@ const axios = require('axios')
  const logger = MAIN_LOGGER.child({ })
 //  logger.level = 'trace'
  
- const useStore = !process.argv.includes('--no-store')
- const doReplies = !process.argv.includes('--no-reply')
+const useStore = !process.argv.includes('--no-store')
  
- // external map to store retry counts of messages when decryption/encryption fails
- // keep this out of the socket itself, so as to prevent a message decryption/encryption loop across socket restarts
- const msgRetryCounterMap = () => MessageRetryMap = { }
- 
- // start a connection
- 
+// external map to store retry counts of messages when decryption/encryption fails
+// keep this out of the socket itself, so as to prevent a message decryption/encryption loop across socket restarts
+const msgRetryCounterMap = () => MessageRetryMap = { }
+
+// start a connection
 const connectToWhatsApp = async (token, io) => {
 
     if ( typeof qrcode[token] !== 'undefined' ) {
@@ -53,10 +50,14 @@ const connectToWhatsApp = async (token, io) => {
         io.emit('connection-open', {token, user: sock[token].user, ppUrl})
         return { status: true, message: 'Already connected'}
     } catch (error) {
-        console.log(error)
+        io.emit('message', {token, message: `Try to connecting ${token}`})
+        console.log(`Try to connecting ${token}`)
     }
 
     const { state, saveCreds } = await useMultiFileAuthState(`credentials/${token}`)
+    // fetch latest version of Chrome For Linux
+    const chrome = await getChromeLates()
+    console.log(`using Chrome v${chrome?.data?.versions[0]?.version}, isLatest: ${chrome?.data?.versions.length > 0 ? true : false}`)
     // fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
@@ -76,7 +77,8 @@ const connectToWhatsApp = async (token, io) => {
 
     sock[token] = makeWASocket({
         version,
-        browser: ['Linux', 'Chrome', '103.0.5060.114'],
+        // browser: ['Linux', 'Chrome', '103.0.5060.114'],
+        browser: ['Linux', 'Chrome', chrome?.data?.versions[0]?.version],
         logger,
         printQRInTerminal: true,
         auth: state,
@@ -218,11 +220,23 @@ const connectToWhatsApp = async (token, io) => {
         }
 
         if ( lastDisconnect?.error) {
-            // console.log(lastDisconnect.error)
-            io.emit('message', {token: token, message: "Error", error: lastDisconnect})
-            delete qrcode[token]
-            connectToWhatsApp(token, io)
-            io.emit('message', {token: token, message: "Reconnecting"})
+            if ( lastDisconnect.error.output.statusCode !== 408 ) {
+                io.emit('message', {token: token, message: "Error", error: lastDisconnect})
+                delete qrcode[token]
+                connectToWhatsApp(token, io)
+                io.emit('message', {token: token, message: "Reconnecting"})
+            } else {
+                clearInterval(intervalStore[token])
+                delete sock[token]
+                delete qrcode[token]
+                io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
+                fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
+                    if (err) {
+                        throw err;
+                    }
+                    console.log(`credentials/${token} is deleted`);
+                });
+            }
         }
         // console.log('connection update', update)
     })
@@ -523,6 +537,11 @@ function deleteCredentials(token) {
             status: true, message: 'Nothing deleted'
         }
     }
+}
+
+async function getChromeLates() {
+    const req = await axios.get('https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/stable/versions')
+    return req
 }
 
 module.exports = {
