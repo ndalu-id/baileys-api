@@ -217,10 +217,13 @@ const connectToWhatsApp = async (token, io) => {
             delete qrcode[token]
         }
 
-        // if ( lastDisconnect?.error) {
-        //     console.log(lastDisconnect.error)
-        //     io.emit('message', {token: token, message: "Error", error: lastDisconnect})
-        // }
+        if ( lastDisconnect?.error) {
+            // console.log(lastDisconnect.error)
+            io.emit('message', {token: token, message: "Error", error: lastDisconnect})
+            delete qrcode[token]
+            connectToWhatsApp(token, io)
+            io.emit('message', {token: token, message: "Reconnecting"})
+        }
         // console.log('connection update', update)
     })
     
