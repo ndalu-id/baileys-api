@@ -175,23 +175,12 @@ const connectToWhatsApp = async (token, io) => {
                 connectToWhatsApp(token, io)
             } else {
                 console.log('Connection closed. You are logged out.')
-                clearInterval(intervalStore[token])
-                delete sock[token]
-                delete qrcode[token]
                 io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
-                fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
-                    if (err) {
-                        throw err;
-                    }
-                    console.log(`credentials/${token} is deleted`);
-                });
+                clearConnection(token)
             }
         }
 
         if (qr) {
-            // console.log('QR CODE:\n'+qr)
-
-            // CONVERT THE QRCODE TO DATA URL
             // SEND TO YOUR CLIENT SIDE
             QRCode.toDataURL(qr, function (err, url) {
                 if (err) {
@@ -221,24 +210,14 @@ const connectToWhatsApp = async (token, io) => {
 
         if ( lastDisconnect?.error) {
             if ( lastDisconnect.error.output.statusCode !== 408 ) {
-                io.emit('message', {token: token, message: "Error", error: lastDisconnect})
                 delete qrcode[token]
                 connectToWhatsApp(token, io)
                 io.emit('message', {token: token, message: "Reconnecting"})
             } else {
-                clearInterval(intervalStore[token])
-                delete sock[token]
-                delete qrcode[token]
                 io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
-                fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
-                    if (err) {
-                        throw err;
-                    }
-                    console.log(`credentials/${token} is deleted`);
-                });
+                clearConnection(token)
             }
         }
-        // console.log('connection update', update)
     })
     
     // listen for when the auth credentials is updated
@@ -542,6 +521,18 @@ function deleteCredentials(token) {
 async function getChromeLates() {
     const req = await axios.get('https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/stable/versions')
     return req
+}
+
+function clearConnection(token) {
+    clearInterval(intervalStore[token])
+    delete sock[token]
+    delete qrcode[token]
+    fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
+        if (err) {
+            throw err;
+        }
+        console.log(`credentials/${token} is deleted`);
+    });
 }
 
 module.exports = {
