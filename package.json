@@ -21,7 +21,7 @@
   "version": "1.0.0",
   "description": "Whatsapp remote API multi device, multi instance. Based on baileys. Wanna more support contact me https://caket.org ||  https://ndalu.id",
   "main": "index.js",
-  "repository": "https://github.com/ndalu-id/baileys-express",
+  "repository": "https://github.com/ndalu-id/baileys-api",
   "author": "ndalu-id <tofiknuryanto@gmail.com>",
   "license": "MIT",
   "scripts": {
