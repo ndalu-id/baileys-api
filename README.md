@@ -36,17 +36,25 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## UPDATE
 
-Baileys nolonger using useSingeFileAuthState, now using useMultiFileAuthState. Script updated using last baileys documentation.
+UPDATE .env for random delay multiple send message
 
-Credential and store will saved in the credentials file. Still not trying much, maybe have a bug. Not already checked for more details during my activity.
+    MIN=10 // for minimal random in second
+    MAX=30 // for max random in second
 
-Scheduler messages using node-cron (User must know about cronjob to managing time scheduler) [crontab](https://crontab.guru/)
+Support number in array for multiple send message
 
-When node-cron have Error: Cannot find module 'uuid'
+Adding message type for scheduler
 
-    yarn add uuid
+    - type == 'sendText'
+    - type == 'sendMedia'
+    - type == 'sendButtonMessage'
+    - type == 'sendTemplateMessage'
+    - type == 'sendListMessage'
+    - type == 'sendListMessage'
 
-Emit message when request time out
+Now you can use number as array in scheduler.
+
+Update getMessage on retry sending message.
 
 ## EMIT LIST
 

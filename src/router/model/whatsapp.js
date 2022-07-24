@@ -66,6 +66,15 @@ const connectToWhatsApp = async (token, io) => {
     // can be written out to a file & read from it
     const store = useStore ? makeInMemoryStore({ logger }) : undefined
     store?.readFromFile(`credentials/${token}/multistore.js`)
+
+    // console.log(`\n\n\n-------------------`)
+    // const file = fs.readFileSync(`credentials/test/multistore.js`, {encoding:'utf8'})
+    // let json = JSON.parse(file)
+    // json = json.messages['6282136795287@s.whatsapp.net']
+    // console.log(json)
+    // const getMessage = json.filter( x => x.key.id == '27C0E81F6FCB71E6BA4E431B668A0378')
+    // console.log(getMessage[0].message)
+
     // save every 10s
     intervalStore[token] = setInterval(() => {
         try {
@@ -84,12 +93,16 @@ const connectToWhatsApp = async (token, io) => {
         auth: state,
         msgRetryCounterMap,
         // implement to handle retries
-        getMessage: (AnyMessageContent) => Promise(AnyMessageContent || undefined)
-        // getMessage: async key => {
-        //     return {
-        //         conversation: 'hello'
-        //     }
-        // }
+        // getMessage: (AnyMessageContent) => Promise(AnyMessageContent || undefined) // Not works
+        getMessage: async key => {
+            const file = fs.readFileSync(`credentials/${token}/multistore.js`, {encoding:'utf8'})
+            let json = JSON.parse(file)
+            json = json.messages[key.remoteJid]
+            const getMessage = json.filter( x => x.key.id == key.id)
+            const message = store.messages[key.remoteJid][0]
+            console.log(`\n> resend message ${getMessage[0].message}`)
+            return message
+        }
     })
 
     store?.bind(sock[token].ev)
@@ -233,8 +246,19 @@ const connectToWhatsApp = async (token, io) => {
 async function sendText(token, number, text) {
 
     try {
-        const sendingTextMessage = await sock[token].sendMessage(number, { text: text }) // awaiting sending message
-        return sendingTextMessage
+        if (Array.isArray(number)) {
+            for ( let i = 0;  i < number.length; i++ ) {
+                const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
+                const delay = i * 1000 * random
+                setTimeout(async () => {
+                    await sock[token].sendMessage(number[i], { text: text })
+                }, delay)
+            }
+            return `Sending ${number.length} message start`
+        } else {
+            const sendingTextMessage = await sock[token].sendMessage(number, { text: text }) // awaiting sending message
+            return sendingTextMessage
+        }
     } catch (error) {
         console.log(error)
         return false
@@ -252,74 +276,43 @@ async function sendMedia(token, number, type, url, fileName, caption) {
 
     try {
         if ( type == 'image' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { image: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), caption: caption ? caption : null},
-            )
+            var data = { image: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), caption: caption ? caption : null}
         } else if ( type == 'video' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { video: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), caption: caption ? caption : null},
-            )
+            var data = { video: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), caption: caption ? caption : null}
         } else if ( type == 'audio' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { audio: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), caption: caption ? caption : null},
-            )
+            var data = { audio: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), caption: caption ? caption : null}
         } else if ( type == 'pdf' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/pdf'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/pdf'}
         } else if ( type == 'xls' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/excel'},
-                { url: url }
-            )
-        } else if ( type == 'xls' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/excel'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/excel'}
         } else if ( type == 'xlsx' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
         } else if ( type == 'doc' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/msword'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/msword'}
         } else if ( type == 'docx' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
         } else if ( type == 'zip' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/zip'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/zip'}
         } else if ( type == 'mp3' ) {
-            var sendMsg = await sock[token].sendMessage(
-                number,
-                { document: { url: url }, mimetype: 'application/mp3'},
-                { url: url }
-            )
+            var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/mp3'}
         } else {
             console.log('Please add your won role of mimetype')
             return false
         }
-        // console.log(sendMsg)
-        return sendMsg
+        if (Array.isArray(number)) {
+            for ( let i = 0;  i < number.length; i++ ) {
+                const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
+                const delay = i * 1000 * random
+                setTimeout(async () => {
+                    await sock[token].sendMessage(number[i], data)
+                }, delay)
+            }
+            return `Sending ${number.length} message start`
+        } else {
+            var sendMsg = await sock[token].sendMessage( number, data )
+            // console.log(sendMsg)
+            return sendMsg
+        }
     } catch (error) {
         console.log(error)
         return false
@@ -356,8 +349,19 @@ async function sendButtonMessage(token, number, button, message, footer, type, i
                 headerType: 1
             }
         }
-        const sendMsg = await sock[token].sendMessage(number, buttonMessage)
-        return sendMsg
+        if (Array.isArray(number)) {
+            for ( let i = 0;  i < number.length; i++ ) {
+                const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
+                const delay = i * 1000 * random
+                setTimeout(async () => {
+                    await sock[token].sendMessage(number[i], buttonMessage)
+                }, delay)
+            }
+            return `Sending ${number.length} message start`
+        } else {
+            const sendMsg = await sock[token].sendMessage(number, buttonMessage)
+            return sendMsg
+        }
     } catch (error) {
         console.log(error)
         return false
@@ -389,9 +393,20 @@ async function sendTemplateMessage(token, number, button, text, footer, image) {
                 templateButtons: templateButtons
             }
         }
+        if (Array.isArray(number)) {
+            for ( let i = 0;  i < number.length; i++ ) {
+                const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
+                const delay = i * 1000 * random
+                setTimeout(async () => {
+                    await sock[token].sendMessage(number[i], buttonMessage)
+                }, delay)
+            }
+            return `Sending ${number.length} message start`
+        } else {
+            const sendMsg = await sock[token].sendMessage(number, buttonMessage)
+            return sendMsg
+        }
 
-        const sendMsg = await sock[token].sendMessage(number, buttonMessage)
-        return sendMsg
     } catch (error) {
         console.log(error)
         return false
@@ -412,9 +427,19 @@ async function sendListMessage(token, number, list, text, footer, title, buttonT
             }
         })
         const listMessage = { text, footer, title, buttonText, sections }
-
-        const sendMsg = await sock[token].sendMessage(number, listMessage)
-        return sendMsg
+        if (Array.isArray(number)) {
+            for ( let i = 0;  i < number.length; i++ ) {
+                const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
+                const delay = i * 1000 * random
+                setTimeout(async () => {
+                    await sock[token].sendMessage(number[i], listMessage)
+                }, delay)
+            }
+            return `Sending ${number.length} message start`
+        } else {
+            const sendMsg = await sock[token].sendMessage(number, listMessage)
+            return sendMsg
+        }
     } catch (error) {
         console.log(error)
         return false

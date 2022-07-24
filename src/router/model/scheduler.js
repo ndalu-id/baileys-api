@@ -78,8 +78,18 @@ function writeJsonScheduler(token, json) {
 
 function startScheduler(token, id, time, type, data) {
     schedule[token+'-'+id] = cron.schedule(time, () => {
-        if ( type == 'sendText') {
+        if ( type == 'sendText' ) {
             whatsapp.sendText(token, data.number, data.text)
+        } else if (  type == 'sendMedia' ) {
+            whatsapp.sendMedia(token, data.number, data.type, data.url, data.filName, data.caption)
+        } else if ( type == 'sendButtonMessage') {
+            whatsapp.sendButtonMessage(token, data.number, data.button, data.message, data.footer, data.type, data.image)
+        } else if ( type == 'sendTemplateMessage') {
+            whatsapp.sendTemplateMessage(token, data.number, data.button, data.text, data.footer, data.image)
+        } else if ( type == 'sendListMessage' ) {
+            whatsapp.sendListMessage(token, data.number, data.list, data.text, data.footer, data.title, data.buttonText)
+        } else if ( type == 'sendListMessage' ) {
+            whatsapp.sendListMessage(token, data.number, data.list, data.text, data.footer, data.title, data.buttonText)
         }
     })
 }
