@@ -36,6 +36,8 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## UPDATE
 
+ADD SAMPLE WEBHOOK, check php folder.
+
 UPDATE .env for random delay multiple send message
 
     MIN=10 // for minimal random in second
