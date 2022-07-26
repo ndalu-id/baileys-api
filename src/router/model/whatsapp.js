@@ -149,24 +149,16 @@ const connectToWhatsApp = async (token, io) => {
         const url = process.env.WEBHOOK
         if ( url ) {
             axios.post(url, {
+                token: token,
                 key: key,
                 message: message
             })
             .then(function (response) {
-                console.log(response);
-                try {
-                    io.emit('message-upsert', {token, key, message: message, info: 'Your webhook is configured', response: response})
-                } catch (error) {
-                    lib.log.error(error)
-                }
+                console.log(`\n> RESPONSE FROM WEBHOOK`)
+                console.log(response.data)
             })
             .catch(function (error) {
-                console.log(error);
-                try {
-                    io.emit('message-upsert', {token, key, message: message, alert: 'This is because you not set your webhook to receive this action', error: error})
-                } catch (error) {
-                    lib.log.error(error)
-                }
+                console.log(error)
             });
         }
         /** END WEBHOOK */
