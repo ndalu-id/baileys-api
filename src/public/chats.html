@@ -58,7 +58,6 @@
         const urlSearchParams = new URLSearchParams(window.location.search);
         const params = Object.fromEntries(urlSearchParams.entries());
         const token = params.token
-        if ( token ) getMessages(token)
 
         async function getMessages(token) {
             if (token) {
@@ -74,10 +73,7 @@
                     })
                 })
                 const res = await req.json()
-                // console.log(res)
-                const arr = Object.entries(res)
-                arr.filter( x => Array.isArray(x))
-                console.log(arr)
+                return res
             }
         }
         console.log(params.token)
@@ -188,69 +184,111 @@
                 var subject = new app.Subject();
 
                 var Model = {
-                        start : function() {
-                                $.getJSON("https://s3-us-west-2.amazonaws.com/s.cdpn.io/1089577/contacts2.json", function (data) {
-                                    console.log(data)
-                                        for (var i=0; i<data.elements.length; i++) {
-                                                var e = data.elements[i];
+                    start : async function() {
+                        const data = await getMessages(token)
+                        // console.log(data)
+                        for (var i=0; i<data.length; i++) {
+                            var e = data[i]
+                            e.name = e[2]
+                            e.img = 'https://ndalu.id/favicon.png'
+                            e.online = false
+                            e.messages = e[1]
 
-                                                if (e.online == undefined) {
-                                                        var group = new appGroups(e.name,e.img);
-                                                        for (var j = 0; j < e.members.length; j++) {
-                                                                group.addMember(contactList[e.members[j].contact]);
-                                                                contactList[e.members[j].contact].addGroup(group);
-                                                        }
-                                                        for (var j = 0; j < e.messages.length; j++) {
-                                                                var m = e.messages[j];
-                                                                var message = new appMessages(m.text, m.name, m.time, m.type, true);
-                                                                group.addMessage(message);
-                                                        }
-                                                }
-                                                else {
-                                                        var contact = new appContacts(e.name, e.img, e.online);
-                                                        for (var j = 0; j < e.messages.length; j++) {
-                                                                var m = e.messages[j];
-                                                                var message = new appMessages(m.text, m.name, m.time, m.type, false);
-                                                                contact.addMessage(message);
-                                                        }
-                                                }
-                                        }
-                                        subject.notifyObservers();
-                                });
-                        },
-                        writeMessage : function() {
-                                var msg = new appMessages($(".input-message").val(),"",new Date().getHours() + ":" + new Date().getMinutes(),true);
-                                WhatsApp.View.printMessage(msg);
-                                currentChat.addMessage(msg);
-                                $(".input-message").val("");
-                                $("#" + currentChat.id).addClass("active-contact");
-                                subject.notifyObservers();
-                        },
-                        getMessage : function (text,id,name) {
-                                if (name == undefined) {
-                                        var msg = new appMessages(text, contactList[id].name, new Date().getHours() + ":" + new Date().getMinutes(), false, false);
+                            if (e[0].endsWith('@g.us')) {
+                                // console.log(e)
+                                var group = new appGroups(e.name,e.img);
+                                for (var j = 0; j < e.messages.length; j++) {
+                                        // group.addMember(contactList[e.members[j].contact]);
+                                        // contactList[e.members[j].contact].addGroup(group);
+                                        // group.addMember(e.name);
+                                        // contactList[e.name].addGroup(group);
                                 }
-                                else {
-                                        var msg = new appMessages(text, name, new Date().getHours() + ":" + new Date().getMinutes(), false, true);
+                                for (var j = 0; j < e.messages.length; j++) {
+                                        var m = e.messages[j];
+                                        m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                        m.type = e.messages[j].key.fromMe
+                                        m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
+                                        var message = new appMessages(m.text, m.name, m.time, m.type, true);
+                                        group.addMessage(message);
                                 }
-                                contactList[id].addMessage(msg);
-                                contactList[id].online = new Date().getHours() + ":" + new Date().getMinutes();
-
-                                if(contactList[id] == currentChat) {
-                                        WhatsApp.View.printMessage(msg);
-                                        WhatsApp.View.printContact(contactList[id]);
+                            }
+                            else {
+                                var contact = new appContacts(e.name, e.img, e.online);
+                                for (var j = 0; j < e.messages.length; j++) {
+                                    // console.log(e.messages)
+                                    var m = e.messages[j];
+                                    m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                    m.type = e.messages[j].key.fromMe
+                                    m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
+                                    // console.log(m)
+                                    var message = new appMessages(m.text, m.name, m.time, m.type, e.messages[j].key.fromMe);
+                                    contact.addMessage(message);
                                 }
-                                else {
-                                        contactList[id].newmsg ++;
-                                        WhatsApp.View.printContact(contactList[id]);
-                                }
-                        },
-                        register : function(...args) {
-                        subject.unsubscribeAll();
-                        args.forEach(elem => {
-                                subject.subscribe(elem);
-                        })
+                            }
                         }
+                        subject.notifyObservers();
+                        // $.getJSON("https://s3-us-west-2.amazonaws.com/s.cdpn.io/1089577/contacts2.json", function (data) {
+                        //     for (var i=0; i<data.elements.length; i++) {
+                        //         var e = data.elements[i];
+                        //         console.log(e)
+                        //         if (e.online == undefined) {
+                        //                 var group = new appGroups(e.name,e.img);
+                        //                 for (var j = 0; j < e.members.length; j++) {
+                        //                         group.addMember(contactList[e.members[j].contact]);
+                        //                         contactList[e.members[j].contact].addGroup(group);
+                        //                 }
+                        //                 for (var j = 0; j < e.messages.length; j++) {
+                        //                         var m = e.messages[j];
+                        //                         var message = new appMessages(m.text, m.name, m.time, m.type, true);
+                        //                         group.addMessage(message);
+                        //                 }
+                        //         }
+                        //         else {
+                        //                     var contact = new appContacts(e.name, e.img, e.online);
+                        //                     for (var j = 0; j < e.messages.length; j++) {
+                        //                             var m = e.messages[j];
+                        //                             var message = new appMessages(m.text, m.name, m.time, m.type, false);
+                        //                             contact.addMessage(message);
+                        //                     }
+                        //             }
+                        //     }
+                        //     subject.notifyObservers();
+                        // });
+                    },
+                    writeMessage : function() {
+                            var msg = new appMessages($(".input-message").val(),"",new Date().getHours() + ":" + new Date().getMinutes(),true);
+                            WhatsApp.View.printMessage(msg);
+                            currentChat.addMessage(msg);
+                            $(".input-message").val("");
+                            $("#" + currentChat.id).addClass("active-contact");
+                            subject.notifyObservers();
+                    },
+                    getMessage : function (text,id,name) {
+                        // if (name == undefined) {
+                        if (name.endsWith('@s.whatsapp.net') || name.endsWith('@g.us')) {
+                            var msg = new appMessages(text, contactList[id].name, new Date().getHours() + ":" + new Date().getMinutes(), false, false);
+                        }
+                        else {
+                            var msg = new appMessages(text, name, new Date().getHours() + ":" + new Date().getMinutes(), false, true);
+                        }
+                        contactList[id].addMessage(msg);
+                        contactList[id].online = new Date().getHours() + ":" + new Date().getMinutes();
+
+                        if(contactList[id] == currentChat) {
+                            WhatsApp.View.printMessage(msg);
+                            WhatsApp.View.printContact(contactList[id]);
+                        }
+                        else {
+                            contactList[id].newmsg ++;
+                            WhatsApp.View.printContact(contactList[id]);
+                        }
+                    },
+                    register : function(...args) {
+                    subject.unsubscribeAll();
+                    args.forEach(elem => {
+                            subject.subscribe(elem);
+                    })
+                    }
                 };
                 app.Model = Model;
                 return app;

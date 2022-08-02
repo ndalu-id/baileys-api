@@ -92,192 +92,153 @@ const connectToWhatsApp = async (token, io) => {
     sock[token] = makeWASocket({
         version,
         // browser: ['Linux', 'Chrome', '103.0.5060.114'],
-        // browser: ['Linux', 'Chrome', chrome?.data?.versions[0]?.version],
+        browser: ['Linux', 'Chrome', chrome?.data?.versions[0]?.version],
         logger,
         printQRInTerminal: true,
         auth: state,
         msgRetryCounterMap,
+        // implement to handle retries
+        // getMessage: (AnyMessageContent) => Promise(AnyMessageContent || undefined) // Not works
         getMessage: async key => {
-			if(store) {
-				const msg = await store.loadMessage(key.remoteJid, key.id, undefined)
-				return msg?.message || undefined
-			}
-
-			// only if store is present
-			return {
-				conversation: 'hello'
-			}
-		}
+            try {
+                const file = fs.readFileSync(`credentials/${token}/multistore.js`, {encoding:'utf8'})
+                let json = JSON.parse(file)
+                json = json.messages[key.remoteJid]
+                const getMessage = json.filter( x => x.key.id == key.id)
+                const message = store.messages[key.remoteJid][0]
+                console.log(`\n> resend message ${getMessage[0].message}`)
+                return message
+            } catch (error) {
+                return false
+            }
+        }
     })
 
     store?.bind(sock[token].ev)
 
-    sock[token].ev.process(
-		// events is a map for event name => event data
-		async(events) => {
-			// something about the connection changed
-			// maybe it closed, or we received all offline message or connection opened
-			if(events['connection.update']) {
-				const update = events['connection.update']
-				const { connection, lastDisconnect, qr } = update
-                if(connection === 'close') {
-                    // reconnect if not logged out
-                    if((lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut) {
-                        return connectToWhatsApp(token, io)
-                    }
-                    console.log('Connection closed. You are logged out.')
-                    io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
-                    await clearConnection(token)
+    // const sendMessageWTyping = async({msg: AnyMessageContent, jid: string}) => {
+    //     await sock.presenceSubscribe(jid)
+    //     await delay(500)
+
+    //     await sock.sendPresenceUpdate('composing', jid)
+    //     await delay(2000)
+
+    //     await sock.sendPresenceUpdate('paused', jid)
+
+    //     await sock.sendMessage(jid, msg)
+    // }
+
+    // sock[token].ev.on('call', item => console.log('recv call event', item))
+    // sock[token].ev.on('chats.set', item => console.log(`recv ${item.chats.length} chats (is latest: ${item.isLatest})`))
+    // sock[token].ev.on('messages.set', item => console.log(`recv ${item.messages.length} messages (is latest: ${item.isLatest})`))
+    sock[token].ev.on('contacts.set', item => console.log(`recv ${item.contacts.length} contacts`))
+
+    sock[token].ev.on('messages.upsert', async m => {
+        // console.log(JSON.stringify(m, undefined, 2))
+
+        // const msg = m.messages[0]
+        // if(!msg.key.fromMe && m.type === 'notify' && doReplies) {
+        //     console.log('replying to', m.messages[0].key.remoteJid)
+        //     // await sock.sendReadReceipt(msg.key.remoteJid, msg.key.participant, [msg.key.id])
+        //     // await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid)
+        // }
+        
+        // console.log('got contacts', Object.values(store.chats))
+        store?.writeToFile(`credentials/${token}/multistore.js`)
+
+        const key = m.messages[0].key
+        const message = m.messages[0].message
+        
+        console.log( {key, message} )
+
+        await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
+        io.emit('message-upsert', {token, key, message})
+
+        /** START WEBHOOK */
+        const url = process.env.WEBHOOK
+        if ( url ) {
+            axios.post(url, {
+                token: token,
+                key: key,
+                message: message
+            })
+            .then(function (response) {
+                console.log(`\n> RESPONSE FROM WEBHOOK`)
+                console.log(response.data)
+            })
+            .catch(function (error) {
+                console.log(error)
+            });
+        }
+        /** END WEBHOOK */
+
+    })
+
+    // sock[token].ev.on('messages.update', m => console.log(m))
+    // sock[token].ev.on('message-receipt.update', m => console.log(m))
+    // sock[token].ev.on('presence.update', m => console.log(m))
+    // sock[token].ev.on('chats.update', m => console.log(m))
+    // sock[token].ev.on('chats.delete', m => console.log(m))
+    sock[token].ev.on('contacts.upsert', m => {
+        console.log(m)
+        sock[token].ev.on('contacts.set', item => console.log(`recv ${item.contacts.length} contacts`))
+    })
+
+    sock[token].ev.on('connection.update', async (update) => {
+        const { connection, qr, lastDisconnect } = update
+        if(connection === 'close') {
+            // reconnect if not logged out
+            if((lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut) {
+                return connectToWhatsApp(token, io)
+            }
+            console.log('Connection closed. You are logged out.')
+            io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
+            await clearConnection(token)
+        }
+
+        if (qr) {
+            // SEND TO YOUR CLIENT SIDE
+            QRCode.toDataURL(qr, function (err, url) {
+                if (err) {
+                    logger.error(err)
                 }
-				
-                if (qr) {
-                    // SEND TO YOUR CLIENT SIDE
-                    QRCode.toDataURL(qr, function (err, url) {
-                        if (err) {
-                            logger.error(err)
-                        }
-                        qrcode[token] = url
-                        try {
-                            io.emit('qrcode', {token, data: url, message: "Qrcode updated, please scann with your Whatsapp Device"})
-                        } catch (error) {
-                            lib.log.error(error)
-                        }
-                    })
+                qrcode[token] = url
+                try {
+                    io.emit('qrcode', {token, data: url, message: "Qrcode updated, please scann with your Whatsapp Device"})
+                } catch (error) {
+                    lib.log.error(error)
                 }
+            })
+        }
+
+        if(connection === 'open') {
+            logger.info('opened connection')
+            logger.info(sock[token].user)
+            await sock[token].sendPresenceUpdate('unavailable')
+
+            let number = sock[token].user.id.split(':')
+            number = number[0]+'@s.whatsapp.net'
+
+            const ppUrl = await getPpUrl(token, number)
+            io.emit('connection-open', {token, user: sock[token].user, ppUrl})
+            delete qrcode[token]
+        }
+
+        if ( lastDisconnect?.error) {
+            if ( lastDisconnect.error.output.statusCode !== 408 ) {
+                delete qrcode[token]
+                connectToWhatsApp(token, io)
+                io.emit('message', {token: token, message: "Reconnecting"})
+            } else {
+                io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
+                delete qrcode[token]
+                await clearConnection(token)
+            }
+        }
+    })
     
-                if(connection === 'open') {
-                    logger.info('opened connection')
-                    logger.info(sock[token].user)
-                    await sock[token].sendPresenceUpdate('unavailable')
-        
-                    let number = sock[token].user.id.split(':')
-                    number = number[0]+'@s.whatsapp.net'
-        
-                    const ppUrl = await getPpUrl(token, number)
-                    io.emit('connection-open', {token, user: sock[token].user, ppUrl})
-                    delete qrcode[token]
-                }
-
-                if ( lastDisconnect?.error) {
-                    if ( lastDisconnect.error.output.statusCode !== 408 ) {
-                        delete qrcode[token]
-                        connectToWhatsApp(token, io)
-                        io.emit('message', {token: token, message: "Reconnecting"})
-                    } else {
-                        io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
-                        delete qrcode[token]
-                        await clearConnection(token)
-                    }
-                }
-
-                console.log('connection update', update)
-			}
-
-			// credentials updated -- save them
-			if(events['creds.update']) {
-				await saveCreds()
-			}
-
-			if(events.call) {
-				console.log('recv call event', events.call)
-			}
-
-			// chat history received
-			if(events['chats.set']) {
-                const { chats, isLatest } = events['chats.set']
-				console.log(`recv ${chats.length} chats (is latest: ${isLatest})`)
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			// message history received
-			if(events['messages.set']) {
-                const { messages, isLatest } = events['messages.set']
-				console.log(`recv ${messages.length} messages (is latest: ${isLatest})`)
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			if(events['contacts.set']) {
-				const { contacts, isLatest } = events['contacts.set']
-				console.log(`recv ${contacts.length} contacts (is latest: ${isLatest})`)
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			// received a new message
-			if(events['messages.upsert']) {
-				const upsert = events['messages.upsert']
-				console.log('recv messages ', JSON.stringify(upsert, undefined, 2))
-
-				if(upsert.type === 'notify') {
-					for(const msg of upsert.messages) {
-						// if(!msg.key.fromMe && doReplies) {
-						if(!msg.key.fromMe) {
-							// console.log('replying to', msg.key.remoteJid)
-							// await sock!.sendReadReceipt(msg.key.remoteJid!, msg.key.participant!, [msg.key.id!])
-							// await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!)
-                            store?.writeToFile(`credentials/${token}/multistore.js`)
-
-                            const key = msg.key
-                            const message = msg.message
-                            console.log({key, message})
-
-                            await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
-                            io.emit('message-upsert', {token, key, message})
-
-                            /** START WEBHOOK */
-                            const url = process.env.WEBHOOK
-                            if ( url ) {
-                                axios.post(url, {
-                                    token: token,
-                                    key: key,
-                                    message: message
-                                })
-                                .then(function (response) {
-                                    console.log(`\n> RESPONSE FROM WEBHOOK`)
-                                    console.log(response.data)
-                                })
-                                .catch(function (error) {
-                                    console.log(error)
-                                });
-                            }
-                            /** END WEBHOOK */
-						}
-					}
-				}
-
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			// messages updated like status delivered, message deleted etc.
-			if(events['messages.update']) {
-				console.log(events['messages.update'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			if(events['message-receipt.update']) {
-				console.log(events['message-receipt.update'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			if(events['messages.reaction']) {
-				console.log(events['messages.reaction'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			if(events['presence.update']) {
-				console.log(events['presence.update'])
-			}
-
-			if(events['chats.update']) {
-				console.log(events['chats.update'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-
-			if(events['chats.delete']) {
-				console.log('chats deleted ', events['chats.delete'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
-			}
-		}
-	)
+    // listen for when the auth credentials is updated
+    sock[token].ev.on('creds.update', saveCreds)
 
     return {
         sock: sock[token],
