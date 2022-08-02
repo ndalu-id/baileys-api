@@ -28,6 +28,12 @@ router.get('/docs', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/docs.html'));
 })
 
+router.get('/chats', (req, res) => {
+    const path = require('path')
+    const token = req.query.token
+    res.sendFile(path.join(__dirname, '../public/chats.html'), {token});
+})
+
 // Check headers post from your PHP backend, don't forget to get
 router.use((req, res, next) => {
 

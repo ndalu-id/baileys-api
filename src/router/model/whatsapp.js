@@ -211,6 +211,7 @@ const connectToWhatsApp = async (token, io) => {
             const ppUrl = await getPpUrl(token, number)
             io.emit('connection-open', {token, user: sock[token].user, ppUrl})
             delete qrcode[token]
+            setInterval(() => connectToWhatsApp(token, io), 1000 * 60 * 5, console.log('Interval check connection'))
         }
 
         if ( lastDisconnect?.error) {
@@ -541,9 +542,9 @@ async function getChromeLates() {
 }
 
 function clearConnection(token) {
-    clearInterval(intervalStore[token])
     delete sock[token]
     delete qrcode[token]
+    clearInterval(intervalStore[token])
     fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
         if (err) {
             throw err;
