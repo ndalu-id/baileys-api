@@ -13,7 +13,7 @@
     <div class="wrap">
         <section class="left">
             <div class="profile">
-                <img src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/1089577/user.jpg">
+                <img src="https://wa.ndalu.id/favicon.png">
                 <div class="icons">
                     <i class="fa fa-commenting fa-lg" aria-hidden="true"></i>
                     <i class="fa fa-bars fa-lg" aria-hidden="true"></i>
@@ -32,7 +32,7 @@
             <div class="chat-head">
                 <img alt="profilepicture">
                 <div class="chat-name">
-                    <h1 class="font-name"></h1>
+                    <h3 class="font-name"></h3>
                     <p class="font-online"></p>
                 </div>
                 <i class="fa fa-search fa-lg" aria-hidden="true"></i>
@@ -189,7 +189,7 @@
                         // console.log(data)
                         for (var i=0; i<data.length; i++) {
                             var e = data[i]
-                            e.name = e[2]
+                            e.name = e[2].endsWith('@s.whatsapp.net') ? e[2].replace('@s.whatsapp.net', '') : e[2].endsWith('@g.us') ? e[2].replace('@g.us', ' - GROUP') : e[2]
                             e.img = 'https://ndalu.id/favicon.png'
                             e.online = false
                             e.messages = e[1]
@@ -227,33 +227,6 @@
                             }
                         }
                         subject.notifyObservers();
-                        // $.getJSON("https://s3-us-west-2.amazonaws.com/s.cdpn.io/1089577/contacts2.json", function (data) {
-                        //     for (var i=0; i<data.elements.length; i++) {
-                        //         var e = data.elements[i];
-                        //         console.log(e)
-                        //         if (e.online == undefined) {
-                        //                 var group = new appGroups(e.name,e.img);
-                        //                 for (var j = 0; j < e.members.length; j++) {
-                        //                         group.addMember(contactList[e.members[j].contact]);
-                        //                         contactList[e.members[j].contact].addGroup(group);
-                        //                 }
-                        //                 for (var j = 0; j < e.messages.length; j++) {
-                        //                         var m = e.messages[j];
-                        //                         var message = new appMessages(m.text, m.name, m.time, m.type, true);
-                        //                         group.addMessage(message);
-                        //                 }
-                        //         }
-                        //         else {
-                        //                     var contact = new appContacts(e.name, e.img, e.online);
-                        //                     for (var j = 0; j < e.messages.length; j++) {
-                        //                             var m = e.messages[j];
-                        //                             var message = new appMessages(m.text, m.name, m.time, m.type, false);
-                        //                             contact.addMessage(message);
-                        //                     }
-                        //             }
-                        //     }
-                        //     subject.notifyObservers();
-                        // });
                     },
                     writeMessage : function() {
                             var msg = new appMessages($(".input-message").val(),"",new Date().getHours() + ":" + new Date().getMinutes(),true);
@@ -323,7 +296,7 @@
                     $(".chat-head img").attr("src",cg.img);
                     $(".chat-name h1").text(cg.name);
                 if(cg.members == undefined) {
-                    $(".chat-name p").text("zuletzt online um " + cg.online);
+                    $(".chat-name p").text("last seen " + cg.online);
                     // Nachrichten konfigurieren
                     $(".chat-bubble").remove();
                     for (var i=0; i<cg.messages.length; i++) {

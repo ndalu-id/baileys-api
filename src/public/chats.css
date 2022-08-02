@@ -48,9 +48,10 @@ i {
   display: flex;
   height: 100vh;
   min-width: 600px;
-  max-width: 1200px;
-  margin: auto;
+  max-width: 100%;
+  margin: 20px 20px 20px 20px;
   box-shadow: 0 2px 2px #aaaaaa;
+  /* transform: translate(20px, 20px); */
 }
 
 /* ------ LEFT SIDE ------ */
