@@ -36,6 +36,8 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## UPDATE
 
+UPDATE to baileys 4.3
+
 ADD SAMPLE WEBHOOK, check php folder.
 
 UPDATE .env for random delay multiple send message
