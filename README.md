@@ -3,7 +3,7 @@
 ![Wa.ndalu.id!](https://wa.ndalu.id/favicon.png "Tofik Nuryanto")
 
     DEPENDENCIES : {
-        "@adiwajshing/baileys": "^4.2.0",
+        "@adiwajshing/baileys": "^4.3.0",
         "@adiwajshing/keyed-db": "^0.2.4",
         "axios": "^0.27.2",
         "body-parser": "^1.20.0",
