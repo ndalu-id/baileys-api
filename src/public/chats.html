@@ -76,14 +76,34 @@
                 return res
             }
         }
+
+        async function getGroupMetadata(token, id) {
+            if (token) {
+                const req = await fetch('/api/whatsapp/group-metadata', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg=='
+                    },
+                    body: JSON.stringify({
+                        "token": token,
+                        "number": id
+                    })
+                })
+                const res = await req.json()
+                // console.log(res)
+                return res
+            }
+        }
         // console.log(params.token)
     </script>
 
     <script>
         //contacts
         var WhatsApp = (function (app) {
-            function Contact (name,img,online) {
+            function Contact (jid,name,img,online) {
                 this.id = contactList.length;
+                this.jid = jid;
                 this.name = name;
                 this.img = img;
                 this.online = online;
@@ -189,37 +209,92 @@
                         data = data.reverse()
                         // console.log(Array.isArray(data))
                         // console.log(data.reverse())
-                        for (var i=0; i<data.length; i++) {
+                        for (let i=0; i<data.length; i++) {
                             var e = data[i]
-                            e.name = e[2].endsWith('@s.whatsapp.net') ? e[2].replace('@s.whatsapp.net', '') : e[2].endsWith('@g.us') ? e[2].replace('@g.us', ' - GROUP') : e[2]
-                            e.img = 'https://ndalu.id/favicon.png'
+                            e.name = e[2].endsWith('@s.whatsapp.net') ? e[2].replace('@s.whatsapp.net', '') : e[2]
+                            e.img = e[3]
+                            e.jid = e[0]
                             e.online = false
                             e.messages = e[1]
 
-                            if (e[0].endsWith('@g.us')) {
-                                // console.log(e)
+                            if (e[0].endsWith('@g.us') && i == 336) {
+                                // console.log(e[0].endsWith('@g.us') + ' ' + i)
                                 var group = new appGroups(e.name,e.img);
-                                // for (var j = 0; j < e.messages.length; j++) {
-                                //         // group.addMember(contactList[e.members[j].contact]);
-                                //         // contactList[e.members[j].contact].addGroup(group);
-                                //         // group.addMember(e.name);
-                                //         // contactList[e.name].addGroup(group);
+                                const data = await getGroupMetadata(token, e[0])
+                                const gr = contactList.filter( x => x.name == e[0])[0]
+                                gr.members = data.data.participants
+                                
+                                console.log({gr, data})
+                                
+                                const changeName = setInterval(() => {
+                                    change(gr.id)
+                                }, 2000)
+
+                                function change(id) {
+                                    // console.log('searching '+id)
+                                    try {
+                                        const elm = document.querySelectorAll('.contact')
+                                        elm.forEach( x => {
+                                            if ( x.getAttribute('id') == id) {
+                                                contactList[id].name = data.data.subject
+                                                // console.log(contactList[id].messages)
+                                                clearInterval(changeName)
+                                                x.querySelector('.contact-preview').querySelector('.contact-text').querySelector('.font-name').innerHTML = data.data.subject
+                                            }
+                                        })
+                                    } catch (error) {
+                                        return false
+                                    }
+                                }
+                                // for (var j = 0; j < data.data.participants.length; j++) {
+                                //     const e = data.data.participants[j]
+                                //     // e.jid = e.id
+                                //     const gData = contactList.filter(x => x.jid == e.jid)[0]
+                                //     console.log(gData.members)
+                                //     // group.addMember(gData.members);
+                                //     // console.log(group)
+                                //     console.log(contactList.Contact)
+
+                                //     // default
+                                //     // group.addMember(contactList[e.members[j].contact]);
+                                //     // contactList[e.members[j].contact].addGroup(group);
                                 // }
                                 for (var j = 0; j < e.messages.length; j++) {
-                                        var m = e.messages[j];
-                                        m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || 'JSON'
-                                        m.type = e.messages[j].key.fromMe
-                                        m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
-                                        var message = new appMessages(m.text, m.name, m.time, m.type, true);
-                                        group.addMessage(message);
+                                    let name
+                                    if ( m.name == undefined) {
+                                        const get = contactList.filter(x => x.jid == m.participant)[0]
+                                        name = get?.name
+                                    }
+                                    var m = e.messages[j];
+                                    m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || 'JSON'
+                                    m.type = e.messages[j].key.fromMe
+                                    m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
+                                    var message = new appMessages(m.text, name, m.time, m.type, true);
+                                    group.addMessage(message);
                                 }
                             }
                             else {
-                                var contact = new appContacts(e.name, e.img, e.online);
+                                var contact = new appContacts(e.jid, e.name, e.img, e.online);
                                 for (var j = 0; j < e.messages.length; j++) {
                                     // console.log(e.messages)
                                     var m = e.messages[j];
-                                    m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                    if ( m.message?.conversation ) {
+                                        m.text = m.message?.conversation
+                                    } else if ( m.message?.extendedTextMessage?.text ) {
+                                        m.text = m.message?.extendedTextMessage?.text
+                                    } else if ( m.message?.imageMessage ) {
+                                        if ( m.message?.imageMessage?.jpegThumbnail ) {
+                                            var prev = `<img src="data:${m.message?.imageMessage?.mimetype};base64,${m.message?.imageMessage?.jpegThumbnail}" />`
+                                        } else {
+                                            var prev = `<img src="" height="100" />Image Maybe Deleted`
+                                        }
+                                        m.text = `${prev}${m.message?.imageMessage?.caption ? m.message?.imageMessage?.caption : ''}`
+                                    } else if ( m.message?.documentMessage ) {
+                                        m.text = m.message?.documentMessage?.fileName + '.' + m.message?.documentMessage?.mimetype.split('/')[1]
+                                    } else {
+                                        '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                    }
+                                    // m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
                                     m.type = e.messages[j].key.fromMe
                                     m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
                                     // console.log(m)
@@ -229,18 +304,19 @@
                             }
                         }
                         subject.notifyObservers();
+                        $('.contact')[0].click()
                     },
                     writeMessage : function() {
-                            var msg = new appMessages($(".input-message").val(),"",new Date().getHours() + ":" + new Date().getMinutes(),true);
-                            WhatsApp.View.printMessage(msg);
-                            currentChat.addMessage(msg);
-                            $(".input-message").val("");
-                            $("#" + currentChat.id).addClass("active-contact");
-                            subject.notifyObservers();
+                        var msg = new appMessages($(".input-message").val(),"",new Date().getHours() + ":" + new Date().getMinutes(),true);
+                        WhatsApp.View.printMessage(msg);
+                        currentChat.addMessage(msg);
+                        $(".input-message").val("");
+                        $("#" + currentChat.id).addClass("active-contact");
+                        subject.notifyObservers();
                     },
                     getMessage : function (text,id,name) {
-                        // if (name == undefined) {
-                        if (name.endsWith('@s.whatsapp.net') || name.endsWith('@g.us')) {
+                        if (name == undefined) {
+                        // if (name.endsWith('@s.whatsapp.net') || name.endsWith('@g.us')) {
                             var msg = new appMessages(text, contactList[id].name, new Date().getHours() + ":" + new Date().getMinutes(), false, false);
                         }
                         else {
@@ -259,10 +335,10 @@
                         }
                     },
                     register : function(...args) {
-                    subject.unsubscribeAll();
-                    args.forEach(elem => {
+                        subject.unsubscribeAll();
+                        args.forEach(elem => {
                             subject.subscribe(elem);
-                    })
+                        })
                     }
                 };
                 app.Model = Model;
@@ -324,23 +400,23 @@
                 }
                 },
                 printMessage : function (gc) {
-                if (gc.group) {
-                    if (gc.type) {
-                        $(".chat").append("<div class='chat-bubble me'><div class='my-mouth'></div><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
+                    if (gc.group) {
+                        if (gc.type) {
+                            $(".chat").append("<div class='chat-bubble me'><div class='my-mouth'></div><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
+                        }
+                        else {
+                            $(".chat").append("<div class='chat-bubble you'><div class='your-mouth'></div><h4>" + gc.name + "</h4><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
+                        }
                     }
                     else {
-                        $(".chat").append("<div class='chat-bubble you'><div class='your-mouth'></div><h4>" + gc.name + "</h4><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
+                        if (gc.type) {
+                            $(".chat").append("<div class='chat-bubble me'><div class='my-mouth'></div><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
+                        }
+                        else {
+                            $(".chat").append("<div class='chat-bubble you'><div class='your-mouth'></div><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
+                        }
                     }
-                }
-                else {
-                    if (gc.type) {
-                        $(".chat").append("<div class='chat-bubble me'><div class='my-mouth'></div><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
-                    }
-                    else {
-                        $(".chat").append("<div class='chat-bubble you'><div class='your-mouth'></div><div class='content'>" + gc.text + "</div><div class='time'>" + gc.time + "</div></div>");
-                    }
-                }
-            },
+                },
                 showContactInformation : function () {
                     $(".chat-head i").hide();
                     $(".information").css("display", "flex");
@@ -427,6 +503,8 @@
                 $("#nm" + that.id).remove();
                 that.newmsg = 0;
                 WhatsApp.View.printChat(that);
+                // console.log(contactList.filter( x => x.id == this.id)[0])
+                // console.log(this.id)
             });
         },
             
