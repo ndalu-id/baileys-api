@@ -68,14 +68,6 @@ const connectToWhatsApp = async (token, io) => {
     const store = useStore ? makeInMemoryStore({ logger }) : undefined
     store?.readFromFile(`credentials/${token}/multistore.js`)
 
-    // console.log(`\n\n\n-------------------`)
-    // const file = fs.readFileSync(`credentials/test/multistore.js`, {encoding:'utf8'})
-    // let json = JSON.parse(file)
-    // json = json.messages['6282136795287@s.whatsapp.net']
-    // console.log(json)
-    // const getMessage = json.filter( x => x.key.id == '27C0E81F6FCB71E6BA4E431B668A0378')
-    // console.log(getMessage[0].message)
-
     // save every 10s
     intervalStore[token] = setInterval(() => {
         try {
@@ -85,14 +77,18 @@ const connectToWhatsApp = async (token, io) => {
         }
     }, 10_000)
     intervalConnCheck[token] = setInterval(() => {
-        connectToWhatsApp(token, io)
+        const check = connectToWhatsApp(token, io)
         console.log('Interval check connection')
+        console.log(check)
     }, 1000 * 60 * 5)
+
+    // const chromeVersion = chrome?.data?.versions[0]?.version || '103.0.5060.114'
+    // console.log(chromeVersion+' used')
 
     sock[token] = makeWASocket({
         version,
-        // browser: ['Linux', 'Chrome', '103.0.5060.114'],
-        // browser: ['Linux', 'Chrome', chrome?.data?.versions[0]?.version],
+        browser: ['Linux', 'Chrome', '103.0.5060.114'],
+        // browser: ['Linux', 'Chrome', chromeVersion],
         logger,
         printQRInTerminal: true,
         auth: state,
@@ -105,7 +101,7 @@ const connectToWhatsApp = async (token, io) => {
 
 			// only if store is present
 			return {
-				conversation: 'hello'
+				conversation: 'Hello, this is resending message. But my message was lost. Please reply this message to tell me the message is lost.\n\nRegard web dev *ndalu.id*'
 			}
 		}
     })
@@ -123,11 +119,12 @@ const connectToWhatsApp = async (token, io) => {
                 if(connection === 'close') {
                     // reconnect if not logged out
                     if((lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut) {
-                        return connectToWhatsApp(token, io)
+                        await connectToWhatsApp(token, io)
+                    } else {
+                        console.log('Connection closed. You are logged out.')
+                        io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
+                        await clearConnection(token)
                     }
-                    console.log('Connection closed. You are logged out.')
-                    io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
-                    await clearConnection(token)
                 }
 				
                 if (qr) {
@@ -159,7 +156,7 @@ const connectToWhatsApp = async (token, io) => {
                 }
 
                 if ( lastDisconnect?.error) {
-                    if ( lastDisconnect.error.output.statusCode !== 408 ) {
+                    if ( lastDisconnect.error.output.statusCode !== 408 || lastDisconnect.error.output.statusCode !== 515 ) {
                         delete qrcode[token]
                         connectToWhatsApp(token, io)
                         io.emit('message', {token: token, message: "Reconnecting"})

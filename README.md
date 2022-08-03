@@ -36,7 +36,7 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## UPDATE
 
-UPDATE to baileys 4.3
+UPDATE to baileys 4.3, Chrome version only works on version: 103.0.5060.114. Latest 104.0.5112.79 is not works
 
 ADD SAMPLE WEBHOOK, check php folder.
 

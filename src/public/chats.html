@@ -76,7 +76,7 @@
                 return res
             }
         }
-        console.log(params.token)
+        // console.log(params.token)
     </script>
 
     <script>
@@ -185,8 +185,10 @@
 
                 var Model = {
                     start : async function() {
-                        const data = await getMessages(token)
-                        // console.log(data)
+                        let data = await getMessages(token)
+                        data = data.reverse()
+                        // console.log(Array.isArray(data))
+                        // console.log(data.reverse())
                         for (var i=0; i<data.length; i++) {
                             var e = data[i]
                             e.name = e[2].endsWith('@s.whatsapp.net') ? e[2].replace('@s.whatsapp.net', '') : e[2].endsWith('@g.us') ? e[2].replace('@g.us', ' - GROUP') : e[2]
@@ -197,15 +199,15 @@
                             if (e[0].endsWith('@g.us')) {
                                 // console.log(e)
                                 var group = new appGroups(e.name,e.img);
-                                for (var j = 0; j < e.messages.length; j++) {
-                                        // group.addMember(contactList[e.members[j].contact]);
-                                        // contactList[e.members[j].contact].addGroup(group);
-                                        // group.addMember(e.name);
-                                        // contactList[e.name].addGroup(group);
-                                }
+                                // for (var j = 0; j < e.messages.length; j++) {
+                                //         // group.addMember(contactList[e.members[j].contact]);
+                                //         // contactList[e.members[j].contact].addGroup(group);
+                                //         // group.addMember(e.name);
+                                //         // contactList[e.name].addGroup(group);
+                                // }
                                 for (var j = 0; j < e.messages.length; j++) {
                                         var m = e.messages[j];
-                                        m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                        m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || 'JSON'
                                         m.type = e.messages[j].key.fromMe
                                         m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
                                         var message = new appMessages(m.text, m.name, m.time, m.type, true);
@@ -281,7 +283,7 @@
                     var lastmsg = c.messages[c.messages.length - 1];
 
                     if (c.newmsg == 0) {
-                        var html = $("<div class='contact' id='" + c.id + "'><img src='" + c.img + "' alt='profilpicture'><div class='contact-preview'><div class='contact-text'><h1 class='font-name'>" + c.name + "</h1><p class='font-preview'>" + lastmsg.text + "</p></div></div><div class='contact-time'><p>" + lastmsg.time + "</p></div></div>");
+                        var html = $("<div class='contact' id='" + c.id + "'><img src='" + c.img + "' alt='profilpicture'><div class='contact-preview'><div class='contact-text'><h1 class='font-name'>" + c.name + "</h1><p class='font-preview'>" + lastmsg?.text + "</p></div></div><div class='contact-time'><p>" + lastmsg?.time + "</p></div></div>");
                     }
                     else {
                         var html = $("<div class='contact new-message-contact' id='" + c.id + "'><img src='" + c.img + "' alt='profilpicture'><div class='contact-preview'><div class='contact-text'><h1 class='font-name'>" + c.name + "</h1><p class='font-preview'>" + lastmsg.text + "</p></div></div><div class='contact-time'><p>" + lastmsg.time + "</p><div class='new-message' id='nm" + c.id + "'><p>" + c.newmsg + "</p></div></div></div>");

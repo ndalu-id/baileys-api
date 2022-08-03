@@ -231,7 +231,7 @@ margin: auto;
   background-color: #e5ddd5;
   background-image: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/1089577/background.png);
   width: 100%;
-  padding: 0px 10%;
+  padding: 0px 30px;
   padding-top: 7px;
   overflow-y: auto;
 }
