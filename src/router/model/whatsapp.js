@@ -5,7 +5,6 @@ const { useSingleFileAuthState, makeInMemoryStore, fetchLatestBaileysVersion, An
 const { DisconnectReason } = require('@adiwajshing/baileys')
 const QRCode = require('qrcode')
 
-// const logger = require('../../lib/pino')
 const lib = require('../../lib')
 const fs = require('fs')
 let sock = []
@@ -18,12 +17,8 @@ const axios = require('axios')
 /***********************************************************
  * FUNCTION
  **********************************************************/
-//  import { Boom } from '@hapi/boom'
-//  import makeWASocket, { AnyMessageContent, delay, DisconnectReason, fetchLatestBaileysVersion, makeInMemoryStore, MessageRetryMap, useMultiFileAuthState } from '../src'
- const MAIN_LOGGER = require('../../lib/pino')
- 
- const logger = MAIN_LOGGER.child({ })
-//  logger.level = 'trace'
+const MAIN_LOGGER = require('../../lib/pino')
+const logger = MAIN_LOGGER.child({ level: 'info' })
  
 const useStore = !process.argv.includes('--no-store')
  
@@ -56,9 +51,11 @@ const connectToWhatsApp = async (token, io) => {
     }
 
     const { state, saveCreds } = await useMultiFileAuthState(`credentials/${token}`)
+    
     // fetch latest version of Chrome For Linux
     const chrome = await getChromeLates()
     console.log(`using Chrome v${chrome?.data?.versions[0]?.version}, isLatest: ${chrome?.data?.versions.length > 0 ? true : false}`)
+    
     // fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
@@ -76,14 +73,11 @@ const connectToWhatsApp = async (token, io) => {
             console.log(error)
         }
     }, 10_000)
-    intervalConnCheck[token] = setInterval(() => {
-        const check = connectToWhatsApp(token, io)
-        console.log('Interval check connection')
-        console.log(check)
+    intervalConnCheck[token] = setInterval(async () => {
+        const check = await connectToWhatsApp(token, io)
+        console.log(`Interval check connection TOKEN: ${token}`)
+        console.log(`> `, check)
     }, 1000 * 60 * 5)
-
-    // const chromeVersion = chrome?.data?.versions[0]?.version || '103.0.5060.114'
-    // console.log(chromeVersion+' used')
 
     sock[token] = makeWASocket({
         version,
@@ -118,12 +112,33 @@ const connectToWhatsApp = async (token, io) => {
 				const { connection, lastDisconnect, qr } = update
                 if(connection === 'close') {
                     // reconnect if not logged out
-                    if((lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut) {
-                        await connectToWhatsApp(token, io)
-                    } else {
+                    // if((lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut) {
+                    //     await connectToWhatsApp(token, io)
+                    // } else {
+                    //     console.log('Connection closed. You are logged out.')
+                    //     io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
+                    //     await clearConnection(token)
+                    // }
+
+                    // Experimental logic last connection check
+                    if((lastDisconnect.error)?.output?.statusCode === DisconnectReason.loggedOut) {
                         console.log('Connection closed. You are logged out.')
                         io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
                         await clearConnection(token)
+                    } else {
+                        if ( (lastDisconnect.error)?.output?.statusCode === 408 ) {
+                            console.log( (lastDisconnect.error)?.output?.payload.error )
+                            io.emit('timeout', {token: token, message: 'Request Time-out.'})
+                            await clearConnection(token)
+                        } else if ( (lastDisconnect.error)?.output?.statusCode === 401 ) {
+                            console.log( update )
+                            io.emit('device_removed', {token: token, message: 'Device removed.'})
+                            await clearConnection(token)
+                        } else {
+                            delete qrcode[token]
+                            connectToWhatsApp(token, io)
+                            io.emit('message', {token: token, message: "Reconnecting"})
+                        }
                     }
                 }
 				
@@ -155,19 +170,20 @@ const connectToWhatsApp = async (token, io) => {
                     delete qrcode[token]
                 }
 
-                if ( lastDisconnect?.error) {
-                    if ( lastDisconnect.error.output.statusCode !== 408 || lastDisconnect.error.output.statusCode !== 515 ) {
-                        delete qrcode[token]
-                        connectToWhatsApp(token, io)
-                        io.emit('message', {token: token, message: "Reconnecting"})
-                    } else {
-                        io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
-                        delete qrcode[token]
-                        await clearConnection(token)
-                    }
-                }
+                // DON't DELETE THIS FOR BACKUP
+                // if ( lastDisconnect?.error) {
+                //     if ( lastDisconnect.error.output.statusCode !== 408 || lastDisconnect.error.output.statusCode !== 515 ) {
+                //         delete qrcode[token]
+                //         connectToWhatsApp(token, io)
+                //         io.emit('message', {token: token, message: "Reconnecting"})
+                //     } else {
+                //         io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
+                //         delete qrcode[token]
+                //         await clearConnection(token)
+                //     }
+                // }
 
-                console.log('connection update', update)
+                // console.log(`connection update TOKEN: ${token} ${new Date()}`, update)
 			}
 
 			// credentials updated -- save them
@@ -183,26 +199,27 @@ const connectToWhatsApp = async (token, io) => {
 			if(events['chats.set']) {
                 const { chats, isLatest } = events['chats.set']
 				console.log(`recv ${chats.length} chats (is latest: ${isLatest})`)
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			// message history received
 			if(events['messages.set']) {
                 const { messages, isLatest } = events['messages.set']
 				console.log(`recv ${messages.length} messages (is latest: ${isLatest})`)
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['contacts.set']) {
 				const { contacts, isLatest } = events['contacts.set']
 				console.log(`recv ${contacts.length} contacts (is latest: ${isLatest})`)
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			// received a new message
 			if(events['messages.upsert']) {
 				const upsert = events['messages.upsert']
-				console.log('recv messages ', JSON.stringify(upsert, undefined, 2))
+				console.log('recv messages TOKEN: '+token)
+				console.log(upsert)
 
 				if(upsert.type === 'notify') {
 					for(const msg of upsert.messages) {
@@ -211,7 +228,7 @@ const connectToWhatsApp = async (token, io) => {
 							// console.log('replying to', msg.key.remoteJid)
 							// await sock!.sendReadReceipt(msg.key.remoteJid!, msg.key.participant!, [msg.key.id!])
 							// await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!)
-                            store?.writeToFile(`credentials/${token}/multistore.js`)
+                            // store?.writeToFile(`credentials/${token}/multistore.js`)
 
                             const key = msg.key
                             const message = msg.message
@@ -229,8 +246,10 @@ const connectToWhatsApp = async (token, io) => {
                                     message: message
                                 })
                                 .then(function (response) {
-                                    console.log(`\n> RESPONSE FROM WEBHOOK`)
-                                    console.log(response.data)
+                                    if ( process.env.NODE_ENV === 'development' ) {
+                                        console.log(`\n> RESPONSE FROM WEBHOOK`)
+                                        console.log(response.data)
+                                    }
                                 })
                                 .catch(function (error) {
                                     console.log(error)
@@ -247,17 +266,17 @@ const connectToWhatsApp = async (token, io) => {
 			// messages updated like status delivered, message deleted etc.
 			if(events['messages.update']) {
 				console.log(events['messages.update'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['message-receipt.update']) {
 				console.log(events['message-receipt.update'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['messages.reaction']) {
 				console.log(events['messages.reaction'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['presence.update']) {
@@ -266,12 +285,12 @@ const connectToWhatsApp = async (token, io) => {
 
 			if(events['chats.update']) {
 				console.log(events['chats.update'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['chats.delete']) {
 				console.log('chats deleted ', events['chats.delete'])
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 		}
 	)

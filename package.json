@@ -26,6 +26,7 @@
   "license": "MIT",
   "scripts": {
     "win-dev": "set NODE_ENV=development&&nodemon src/index",
+    "win-start": "set NODE_ENV=production&&node src/index",
     "dev": "NODE_ENV=development nodemon src/index",
     "start": "NODE_ENV=production node src/index"
   },

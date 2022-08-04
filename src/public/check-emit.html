@@ -90,6 +90,18 @@
             pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
             qrcode.src = data.ppUrl
         })
+        // when request qrcode time out
+        socket.on('timeout', (data) => {
+            arr.push(data)
+            pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
+            qrcode.src = "https://ndalu.id/favicon.png"
+        })
+        // when device removed
+        socket.on('timeout', (data) => {
+            arr.push(data)
+            pre.innerHTML = JSON.stringify(arr.reverse(), undefined, 2)
+            qrcode.src = "https://ndalu.id/favicon.png"
+        })
         // CONSUME SOCKET IO CLIENT SIDE END
 
     </script>

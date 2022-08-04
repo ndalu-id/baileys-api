@@ -202,6 +202,22 @@
                 qrcode.src = data.ppUrl
             }
         })
+        // when request qrcode time out
+        socket.on('timeout', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // remove if you want to watching entire connection
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+                qrcode.src = "https://ndalu.id/favicon.png"
+            }
+        })
+        // when device removed
+        socket.on('timeout', (data) => {
+            // Check if token is same with te data.token, show the qrcode
+            if (data.token === checkToken.value) { // remove if you want to watching entire connection
+                pre.innerHTML = JSON.stringify(data, undefined, 2)
+                qrcode.src = "https://ndalu.id/favicon.png"
+            }
+        })
         // CONSUME SOCKET IO CLIENT SIDE END
 
     </script>
