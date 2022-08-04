@@ -22,26 +22,10 @@
             <div class="wrap-search">
                 <div class="search">
                     <i class="fa fa-search fa" aria-hidden="true"></i>
-                    <input type="text" class="input-search" placeholder="Search">
+                    <input type="text" class="input-search" placeholder="Suchen oder neuen Chat beginnen">
                 </div>
             </div>
-            <div class="contact-list">
-                <div class="contact new-message-contact" id="id">
-                    <img src="" alt="profilpicture">
-                    <div class='contact-preview'>
-                        <div class='contact-text'>
-                            <h1 class='font-name'>Name</h1>
-                            <p class='font-preview'>Last message</p>
-                        </div>
-                    </div>
-                    <div class='contact-time'>
-                        <p>19:00</p>
-                        <div class='new-message' id="id">
-                            <p>New Message</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div class="contact-list"></div>
         </section>
 
         <section class="right">
@@ -57,17 +41,7 @@
                 <i class="fa fa-times fa-lg" aria-hidden="true" id="close-contact-information"></i>
             </div>
             <div class="wrap-chat">
-                <div class="chat">
-                    <div class='chat-bubble me'>
-                        <div class='my-mouth'></div>
-                        <div class='content'>My message</div>
-                        <div class='time'>18:55</div>
-                    </div>
-                    <div class='chat-bubble you'>
-                        <div class='content'>Message</div>
-                        <div class='time'>19:00</div>
-                    </div>
-                </div>
+                <div class="chat"></div>
                 <div class="information"></div>
             </div>
             <div class="wrap-message">
@@ -81,16 +55,9 @@
     </div>
 
     <script>
-
-        let contact = []
-        let group = []
-        let status = []
-
         const urlSearchParams = new URLSearchParams(window.location.search);
         const params = Object.fromEntries(urlSearchParams.entries());
         const token = params.token
-
-        showMessage(token)
 
         async function getMessages(token) {
             if (token) {
@@ -147,27 +114,6 @@
             return replacedText;
         }
         // console.log(params.token)
-        async function showMessage(token) {
-            if ( token ) {
-                const data = await getMessages(token)
-                if ( Array.isArray(data) ) {
-                    data.map( x => {
-                        if ( x[0].endsWith('@s.whatsapp.net') ) {
-                            contact.push(x)
-                        }
-                        else if ( x[0].endsWith('@g.us') ) {
-                            group.push(x)
-                        }
-                        else {
-                            status.push(x)
-                        }
-                    })
-                    console.log({contact, group, status})
-                }
-                // console.log(message)
-            }
-        }
-
     </script>
 
     <script>
@@ -278,107 +224,106 @@
                 var Model = {
                     start : async function() {
                         let data = await getMessages(token)
-                        if ( Array.isArray(data) ) {
-                            data = data.reverse()
-                            // console.log(Array.isArray(data))
-                            // console.log(data.reverse())
-                            for (let i=0; i<data.length; i++) {
-                                var e = data[i]
-                                e.name = e[2].endsWith('@s.whatsapp.net') ? e[2].replace('@s.whatsapp.net', '') : e[2]
-                                e.img = e[3]
-                                e.jid = e[0]
-                                e.online = false
-                                e.messages = e[1]
-    
-                                if (e[0].endsWith('@g.us') && i == 336) {
-                                    // console.log(e[0].endsWith('@g.us') + ' ' + i)
-                                    var group = new appGroups(e.name,e.img);
-                                    const data = await getGroupMetadata(token, e[0])
-                                    const gr = contactList.filter( x => x.name == e[0])[0]
-                                    gr.members = data.data.participants
-                                    
-                                    // console.log({gr, data})
-                                    
-                                    const changeName = setInterval(() => {
-                                        change(gr.id)
-                                    }, 2000)
-    
-                                    function change(id) {
-                                        // console.log('searching '+id)
-                                        try {
-                                            const elm = document.querySelectorAll('.contact')
-                                            elm.forEach( x => {
-                                                if ( x.getAttribute('id') == id) {
-                                                    contactList[id].name = data.data.subject
-                                                    // console.log(contactList[id].messages)
-                                                    clearInterval(changeName)
-                                                    x.querySelector('.contact-preview').querySelector('.contact-text').querySelector('.font-name').innerHTML = data.data.subject
-                                                }
-                                            })
-                                        } catch (error) {
-                                            return false
-                                        }
-                                    }
-                                    // for (var j = 0; j < data.data.participants.length; j++) {
-                                    //     const e = data.data.participants[j]
-                                    //     // e.jid = e.id
-                                    //     const gData = contactList.filter(x => x.jid == e.jid)[0]
-                                    //     console.log(gData.members)
-                                    //     // group.addMember(gData.members);
-                                    //     // console.log(group)
-                                    //     console.log(contactList.Contact)
-    
-                                    //     // default
-                                    //     // group.addMember(contactList[e.members[j].contact]);
-                                    //     // contactList[e.members[j].contact].addGroup(group);
-                                    // }
-                                    for (var j = 0; j < e.messages.length; j++) {
-                                        let name
-                                        if ( m.name == undefined) {
-                                            const get = contactList.filter(x => x.jid == m.participant)[0]
-                                            name = get?.name
-                                        }
-                                        var m = e.messages[j];
-                                        m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || `<pre>${JSON.stringify(m, undefined, 2)}</pre>`
-                                        m.type = e.messages[j].key.fromMe
-                                        m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
-                                        var message = new appMessages(m.text, name, m.time, m.type, true);
-                                        group.addMessage(message);
+                        data = data.reverse()
+                        // console.log(Array.isArray(data))
+                        // console.log(data.reverse())
+                        for (let i=0; i<data.length; i++) {
+                            var e = data[i]
+                            e.name = e[2].endsWith('@s.whatsapp.net') ? e[2].replace('@s.whatsapp.net', '') : e[2]
+                            e.img = e[3]
+                            e.jid = e[0]
+                            e.online = false
+                            e.messages = e[1]
+
+                            if (e[0].endsWith('@g.us') && i == 336) {
+                                // console.log(e[0].endsWith('@g.us') + ' ' + i)
+                                var group = new appGroups(e.name,e.img);
+                                const data = await getGroupMetadata(token, e[0])
+                                const gr = contactList.filter( x => x.name == e[0])[0]
+                                gr.members = data.data.participants
+                                
+                                console.log({gr, data})
+                                
+                                const changeName = setInterval(() => {
+                                    change(gr.id)
+                                }, 2000)
+
+                                function change(id) {
+                                    // console.log('searching '+id)
+                                    try {
+                                        const elm = document.querySelectorAll('.contact')
+                                        elm.forEach( x => {
+                                            if ( x.getAttribute('id') == id) {
+                                                contactList[id].name = data.data.subject
+                                                // console.log(contactList[id].messages)
+                                                clearInterval(changeName)
+                                                x.querySelector('.contact-preview').querySelector('.contact-text').querySelector('.font-name').innerHTML = data.data.subject
+                                            }
+                                        })
+                                    } catch (error) {
+                                        return false
                                     }
                                 }
-                                else {
-                                    var contact = new appContacts(e.jid, e.name, e.img, e.online);
-                                    for (var j = 0; j < e.messages.length; j++) {
-                                        // console.log(e.messages)
-                                        var m = e.messages[j];
-                                        if ( m.message?.conversation ) {
-                                            m.text = m.message?.conversation
-                                        } else if ( m.message?.extendedTextMessage?.text ) {
-                                            m.text = m.message?.extendedTextMessage?.text
-                                        } else if ( m.message?.imageMessage ) {
-                                            if ( m.message?.imageMessage?.jpegThumbnail ) {
-                                                var prev = `<img src="data:${m.message?.imageMessage?.mimetype};base64,${m.message?.imageMessage?.jpegThumbnail}" />`
-                                            } else {
-                                                var prev = `<img src="" height="100" />Image Maybe Deleted`
-                                            }
-                                            m.text = `${prev}${m.message?.imageMessage?.caption ? m.message?.imageMessage?.caption : ''}`
-                                        } else if ( m.message?.documentMessage ) {
-                                            m.text = m.message?.documentMessage?.fileName + '.' + m.message?.documentMessage?.mimetype.split('/')[1]
-                                        } else {
-                                            m.text = '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
-                                        }
-                                        // m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
-                                        m.type = e.messages[j].key.fromMe
-                                        m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
-                                        // console.log(m)
-                                        var message = new appMessages(m.text, m.name, m.time, m.type, e.messages[j].key.fromMe);
-                                        contact.addMessage(message);
+                                // for (var j = 0; j < data.data.participants.length; j++) {
+                                //     const e = data.data.participants[j]
+                                //     // e.jid = e.id
+                                //     const gData = contactList.filter(x => x.jid == e.jid)[0]
+                                //     console.log(gData.members)
+                                //     // group.addMember(gData.members);
+                                //     // console.log(group)
+                                //     console.log(contactList.Contact)
+
+                                //     // default
+                                //     // group.addMember(contactList[e.members[j].contact]);
+                                //     // contactList[e.members[j].contact].addGroup(group);
+                                // }
+                                for (var j = 0; j < e.messages.length; j++) {
+                                    let name
+                                    if ( m.name == undefined) {
+                                        const get = contactList.filter(x => x.jid == m.participant)[0]
+                                        name = get?.name
                                     }
+                                    var m = e.messages[j];
+                                    m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || 'JSON'
+                                    m.type = e.messages[j].key.fromMe
+                                    m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
+                                    var message = new appMessages(m.text, name, m.time, m.type, true);
+                                    group.addMessage(message);
                                 }
                             }
-                            subject.notifyObservers();
-                            $('.contact')[0].click()
+                            else {
+                                var contact = new appContacts(e.jid, e.name, e.img, e.online);
+                                for (var j = 0; j < e.messages.length; j++) {
+                                    // console.log(e.messages)
+                                    var m = e.messages[j];
+                                    if ( m.message?.conversation ) {
+                                        m.text = m.message?.conversation
+                                    } else if ( m.message?.extendedTextMessage?.text ) {
+                                        m.text = m.message?.extendedTextMessage?.text
+                                    } else if ( m.message?.imageMessage ) {
+                                        if ( m.message?.imageMessage?.jpegThumbnail ) {
+                                            var prev = `<img src="data:${m.message?.imageMessage?.mimetype};base64,${m.message?.imageMessage?.jpegThumbnail}" />`
+                                        } else {
+                                            var prev = `<img src="" height="100" />Image Maybe Deleted`
+                                        }
+                                        m.text = `${prev}${m.message?.imageMessage?.caption ? m.message?.imageMessage?.caption : ''}`
+                                    } else if ( m.message?.documentMessage ) {
+                                        m.text = m.message?.documentMessage?.fileName + '.' + m.message?.documentMessage?.mimetype.split('/')[1]
+                                    } else {
+                                        console.log(m)
+                                        '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                    }
+                                    // m.text = m.message?.conversation || m.message?.extendedTextMessage?.text || '<pre>'+JSON.stringify(m, undefined, 2)+'</pre>'
+                                    m.type = e.messages[j].key.fromMe
+                                    m.time = new Date(m.messageTimestamp * 1000).toLocaleTimeString('id-ID')
+                                    // console.log(m)
+                                    var message = new appMessages(m.text, m.name, m.time, m.type, e.messages[j].key.fromMe);
+                                    contact.addMessage(message);
+                                }
+                            }
                         }
+                        subject.notifyObservers();
+                        $('.contact')[0].click()
                     },
                     writeMessage : function() {
                         var msg = new appMessages($(".input-message").val(),"",new Date().getHours() + ":" + new Date().getMinutes(),true);
@@ -584,22 +529,22 @@
             
             //Observer-Methode
             notify : function() {
-                if (start) {
-                    $(".input-message").keyup(function(ev) {
-                    if(ev.which == 13 || ev.keyCode == 13) {
-                        app.Model.writeMessage();
-                    }
-                    });
-
-                    $("#show-contact-information").on("click",function(){
-                    WhatsApp.View.showContactInformation();
-                    });
-
-                    $("#close-contact-information").on("click",function(){
-                    WhatsApp.View.closeContactInformation();
-                    });
-                    start = false;
+            if (start) {
+                $(".input-message").keyup(function(ev) {
+                if(ev.which == 13 || ev.keyCode == 13) {
+                    app.Model.writeMessage();
                 }
+                });
+
+                $("#show-contact-information").on("click",function(){
+                WhatsApp.View.showContactInformation();
+                });
+
+                $("#close-contact-information").on("click",function(){
+                WhatsApp.View.closeContactInformation();
+                });
+                start = false;
+            }
             }
         };
         app.Ctrl = Ctrl;
@@ -609,6 +554,5 @@
 
         WhatsApp.Model.register(WhatsApp.View, WhatsApp.Ctrl);
     </script>
-
 </body>
 </html>

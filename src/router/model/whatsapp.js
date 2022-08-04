@@ -20,10 +20,6 @@ const axios = require('axios')
 const MAIN_LOGGER = require('../../lib/pino')
 const logger = MAIN_LOGGER.child({ level: 'info' })
  
-const useStore = !process.argv.includes('--no-store')
- 
-// external map to store retry counts of messages when decryption/encryption fails
-// keep this out of the socket itself, so as to prevent a message decryption/encryption loop across socket restarts
 const msgRetryCounterMap = () => MessageRetryMap = { }
 
 // start a connection
@@ -54,7 +50,7 @@ const connectToWhatsApp = async (token, io) => {
     
     // fetch latest version of Chrome For Linux
     const chrome = await getChromeLates()
-    console.log(`using Chrome v${chrome?.data?.versions[0]?.version}, isLatest: ${chrome?.data?.versions.length > 0 ? true : false}`)
+    // console.log(`using Chrome v${chrome?.data?.versions[0]?.version}, isLatest: ${chrome?.data?.versions.length > 0 ? true : false}`)
     
     // fetch latest version of WA Web
     const { version, isLatest } = await fetchLatestBaileysVersion()
@@ -62,10 +58,10 @@ const connectToWhatsApp = async (token, io) => {
 
     // the store maintains the data of the WA connection in memory
     // can be written out to a file & read from it
-    const store = useStore ? makeInMemoryStore({ logger }) : undefined
+    const store = makeInMemoryStore({ logger })
     store?.readFromFile(`credentials/${token}/multistore.js`)
 
-    // save every 10s
+    // interval
     intervalStore[token] = setInterval(() => {
         try {
             store?.writeToFile(`credentials/${token}/multistore.js`)
@@ -110,6 +106,8 @@ const connectToWhatsApp = async (token, io) => {
 			if(events['connection.update']) {
 				const update = events['connection.update']
 				const { connection, lastDisconnect, qr } = update
+
+                // CONNECTION CLOSE
                 if(connection === 'close') {
                     // reconnect if not logged out
                     // if((lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut) {
@@ -142,8 +140,8 @@ const connectToWhatsApp = async (token, io) => {
                     }
                 }
 				
+                // QRCODE
                 if (qr) {
-                    // SEND TO YOUR CLIENT SIDE
                     QRCode.toDataURL(qr, function (err, url) {
                         if (err) {
                             logger.error(err)
@@ -157,6 +155,7 @@ const connectToWhatsApp = async (token, io) => {
                     })
                 }
     
+                // CONNECTION OPEN
                 if(connection === 'open') {
                     logger.info('opened connection')
                     logger.info(sock[token].user)
@@ -218,24 +217,31 @@ const connectToWhatsApp = async (token, io) => {
 			// received a new message
 			if(events['messages.upsert']) {
 				const upsert = events['messages.upsert']
-				console.log('recv messages TOKEN: '+token)
-				console.log(upsert)
 
 				if(upsert.type === 'notify') {
 					for(const msg of upsert.messages) {
 						// if(!msg.key.fromMe && doReplies) {
-						if(!msg.key.fromMe) {
+						if(!msg.key.fromMe && msg.key.remoteJid !== 'status@broadcast') {
 							// console.log('replying to', msg.key.remoteJid)
 							// await sock!.sendReadReceipt(msg.key.remoteJid!, msg.key.participant!, [msg.key.id!])
 							// await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!)
                             // store?.writeToFile(`credentials/${token}/multistore.js`)
 
+                            const id = msg.key.remoteJid
+                            const pushName = msg.pushName
+                            const messageType = Object.keys (msg.message)[0]
+                            const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || undefined
+                            const contextInfo = msg.message?.extendedTextMessage?.contextInfo || undefined
+                            const quotedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || undefined
                             const key = msg.key
                             const message = msg.message
-                            console.log({key, message})
+                            console.log('recv messages TOKEN: '+token)
+                            console.log({
+                                token, id, pushName, messageType, text, contextInfo, quotedMessage, key, message
+                            })
 
                             await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
-                            io.emit('message-upsert', {token, key, message})
+                            io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
 
                             /** START WEBHOOK */
                             const url = process.env.WEBHOOK
@@ -284,7 +290,7 @@ const connectToWhatsApp = async (token, io) => {
 			}
 
 			if(events['chats.update']) {
-				console.log(events['chats.update'])
+				console.log('chats update ', events['chats.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
