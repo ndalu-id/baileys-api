@@ -33,7 +33,7 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## UPDATE
 
-REMOVE baileys from node_moduless. Add baileys own build to src folder. Fix LIST and BUTTON message.
+REMOVE baileys from node_moduless. Add baileys own build to src folder. Fix LIST, BUTTON message and TEMPLATE.
 
 Adding message type for scheduler
 

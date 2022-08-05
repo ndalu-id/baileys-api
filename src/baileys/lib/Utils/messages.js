@@ -600,7 +600,7 @@ const generateContextInfo = () => {
  */
 const patchMessageForMdIfRequired = (message) => {
     const requiresPatch = !!(message.buttonsMessage
-        // || message.templateMessage
+        || message.templateMessage
         || message.listMessage);
     if (requiresPatch) {
         message = {
