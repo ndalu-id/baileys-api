@@ -36,18 +36,7 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
 ## UPDATE
 
-BAILEYS BUG, button and list not sent!!!
-
-UPDATE to baileys 4.3, Chrome version only works on version: 103.0.5060.114. Latest 104.0.5112.79 is not works
-
-ADD SAMPLE WEBHOOK, check php folder.
-
-UPDATE .env for random delay multiple send message
-
-    MIN=10 // for minimal random in second
-    MAX=30 // for max random in second
-
-Support number in array for multiple send message
+REMOVE baileys from node_moduless. Add baileys own build to src folder. Fix LIST and BUTTON message.
 
 Adding message type for scheduler
 

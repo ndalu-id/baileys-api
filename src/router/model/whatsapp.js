@@ -1,8 +1,9 @@
 'use strict'
 
-const { default: makeWASocket, makeWALegacySocket, downloadContentFromMessage } = require('@adiwajshing/baileys')
-const { useSingleFileAuthState, makeInMemoryStore, fetchLatestBaileysVersion, AnyMessageContent, delay, MessageRetryMap, useMultiFileAuthState } = require('@adiwajshing/baileys')
-const { DisconnectReason } = require('@adiwajshing/baileys')
+// const { default: makeWASocket, makeWALegacySocket, downloadContentFromMessage } = require('@adiwajshing/baileys')
+// const { useSingleFileAuthState, makeInMemoryStore, fetchLatestBaileysVersion, AnyMessageContent, delay, MessageRetryMap, useMultiFileAuthState } = require('@adiwajshing/baileys')
+// const { DisconnectReason } = require('@adiwajshing/baileys')
+const { default: makeWASocket, makeInMemoryStore, fetchLatestBaileysVersion, useMultiFileAuthState, DisconnectReason } = require('../../baileys/lib')
 const QRCode = require('qrcode')
 
 const lib = require('../../lib')
@@ -71,8 +72,7 @@ const connectToWhatsApp = async (token, io) => {
     }, 10_000)
     intervalConnCheck[token] = setInterval(async () => {
         const check = await connectToWhatsApp(token, io)
-        console.log(`Interval check connection TOKEN: ${token}`)
-        console.log(`> `, check)
+        console.log(`> Interval check connection TOKEN: ${token}`, check)
     }, 1000 * 60 * 5)
 
     sock[token] = makeWASocket({
@@ -217,6 +217,7 @@ const connectToWhatsApp = async (token, io) => {
 			// received a new message
 			if(events['messages.upsert']) {
 				const upsert = events['messages.upsert']
+                await store.loadMessage(upsert.messages[0].key.remoteJid, upsert.messages[0].key.id)
 
 				if(upsert.type === 'notify') {
 					for(const msg of upsert.messages) {
@@ -266,31 +267,31 @@ const connectToWhatsApp = async (token, io) => {
 					}
 				}
 
-                store?.writeToFile(`credentials/${token}/multistore.js`)
+                // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			// messages updated like status delivered, message deleted etc.
 			if(events['messages.update']) {
-				console.log(events['messages.update'])
+				// console.log('messages update ', events['messages.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['message-receipt.update']) {
-				console.log(events['message-receipt.update'])
+				console.log('message receipt update ', events['message-receipt.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['messages.reaction']) {
-				console.log(events['messages.reaction'])
+				console.log('messages reaction ', events['messages.reaction'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
 			if(events['presence.update']) {
-				console.log(events['presence.update'])
+				console.log('presence update ', events['presence.update'])
 			}
 
 			if(events['chats.update']) {
-				console.log('chats update ', events['chats.update'])
+				// console.log('chats update ', events['chats.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
 			}
 
