@@ -28,11 +28,9 @@ Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
 
     - do update scheduler.json ✔️
     - do reload cron every update scheduler ✔️
-    - do type and data post to add scheduler 🔥🔥🔥
+    - do type and data post to add scheduler ✔️
     - download media 🔥🔥🔥
     - group API 🔥🔥🔥
-    - Should I share or create new FRONT END? 🔥🔥
-    - Optional using STORE or not. You can use your own data store (own database) 🔥🔥
 
 ## UPDATE
 
