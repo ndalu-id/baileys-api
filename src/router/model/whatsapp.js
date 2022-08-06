@@ -61,6 +61,7 @@ const connectToWhatsApp = async (token, io) => {
     // can be written out to a file & read from it
     const store = makeInMemoryStore({ logger })
     store?.readFromFile(`credentials/${token}/multistore.js`)
+    // {"chats":[],"contacts":{},"messages":{}}
 
     // interval
     intervalStore[token] = setInterval(() => {
@@ -78,7 +79,11 @@ const connectToWhatsApp = async (token, io) => {
     sock[token] = makeWASocket({
         version,
         browser: ['Linux', 'Chrome', '103.0.5060.114'],
+        // browser: Browsers.macOS('Ubuntu'),
         // browser: ['Linux', 'Chrome', chromeVersion],
+        syncFullHistory: true,
+        markOnlineOnConnect: false,
+        downloadHistory: true,
         logger,
         printQRInTerminal: true,
         auth: state,
@@ -362,7 +367,7 @@ async function sendMedia(token, number, type, url, fileName, caption) {
         } else if ( type == 'mp3' ) {
             var data = { document: url ? {url} : fs.readFileSync('src/public/temp/'+fileName), mimetype: 'application/mp3'}
         } else {
-            console.log('Please add your won role of mimetype')
+            console.log('Please add your own role of mimetype')
             return false
         }
         if (Array.isArray(number)) {
