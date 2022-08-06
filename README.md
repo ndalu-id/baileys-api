@@ -28,7 +28,12 @@
     }
 
 Whatsapp API based on baileys.
-Demo visit here [wa.ndalu.id](https://wa.ndalu.id)
+
+Demo visit here [ndalu-wa.herokuapp.com](https://ndalu-wa.herokuapp.com/)
+
+## HEROKU
+
+[![How to deploy this app at HEROKU](https://img.youtube.com/vi/EMV7-LRyec4/0.jpg)](https://www.youtube.com/watch?v=EMV7-LRyec4 "How to deploy this app at HEROKU")
 
 ## TODO
 
@@ -810,8 +815,10 @@ Star :star:
 
 Share
 
-[Donation](https://paypal.me/tofiknuryanto)
+[Donation - Paypal](https://paypal.me/tofiknuryanto)
 
-[Ask me on telegram (if not busy)](https://t.me/ndaludotid)
+[Donation - Buy me a coffee](https://www.buymeacoffee.com/tofiknuryanto)
+
+[Ask me on telegram ( Sometime slow response, sorry I'mm hungry )](https://t.me/ndaludotid)
 
 Still updating every have a break time from my activity
