@@ -27,7 +27,7 @@
         "ws": "^8.8.1"
     }
 
-Whatsapp API based on baileys.
+Whatsapp API based on [baileys](https://github.com/adiwajshing/Baileys).
 
 Demo visit here [ndalu-wa.herokuapp.com](https://ndalu-wa.herokuapp.com/)
 
