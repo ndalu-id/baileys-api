@@ -75,7 +75,7 @@ app.get('/*', (req, res) => {
 server.listen(port, log.info(`Server run and listening port: ${port}`))
 
 function autostartInstance() {
-
+    
     const wa = require('./router/model/whatsapp')
     const scheduler = require('./router/model/scheduler')
 

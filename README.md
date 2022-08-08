@@ -726,6 +726,31 @@ Update getMessage on retry sending message.
         }
     ]
 
+## DOWNLOAD MEDIA
+
+After you have a data store (or you can build your own). You can get a message by getting message by jid.
+
+For sample you ca get message from some jid using POST http://localhost:3000/api/whatsapp/store/chats (Read STORE docs). And you will get data like this
+
+![example get message](/src/public/sample-get-store.png)
+
+To download videoMessage from this data is just copy the blocked json like sample up there.
+
+    curl --location --request POST http://localhost:3000/api/whatsapp/download-media \
+    --header 'Content-Type: application/json' \
+    --header 'Authorization: Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' \
+    --data-raw '{
+        "token": "sometoken",
+        "message": {
+            "key": {...},
+            "message": {...}
+        }
+    }'
+
+![example download file](/src/public/result-download.png)
+
+file only ready for 1 hour
+
 ## IMPLEMENTING A DATA STORE
 
 As mentioned earlier, Baileys does not come with a defacto storage for chats, contacts, messages. However, a simple in-memory implementation has been provided. The store listens for chat updates, new messages, message updates etc. to always have an up to date version of the data.

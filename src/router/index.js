@@ -7,6 +7,7 @@ const router = express.Router()
  * THIS IS MAIN ROUTER
  */
 const wa = require('./model/routes')
+const waDownload = require('./model/downloadWhatsappMedia')
 const store = require('./model/store')
 const scheduler = require('./model/scheduler')
 const CryptoJS = require("crypto-js")
@@ -69,6 +70,9 @@ router.post('/api/whatsapp/get-profile-picture', wa.getPpUrl)
 router.post('/api/whatsapp/delete-for-every-one', wa.deleteEveryOne)
 router.post('/api/whatsapp/group-metadata', wa.groupMetadata)
 router.post('/api/whatsapp/delete-credential', wa.deleteCredentials)
+
+// DOWNLOAD
+router.post('/api/whatsapp/download-media', waDownload.downloadWhatsappMedia)
 
 // STORE
 router.post('/api/whatsapp/store/chats', store.chats)
