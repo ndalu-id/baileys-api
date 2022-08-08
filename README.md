@@ -45,6 +45,8 @@ Demo visit here [ndalu-wa.herokuapp.com](https://ndalu-wa.herokuapp.com/)
 
 ## UPDATE
 
+If imageMessage or videoMessage using gif webhook will receive imageBase64 for your media // feature by request Liu Bei. Thanks the donation btw.
+
 REMOVE baileys from node_moduless. Add baileys own build to src folder. Fix LIST, BUTTON message and TEMPLATE.
 
 Adding message type for scheduler
@@ -148,6 +150,8 @@ Update getMessage on retry sending message.
 
     REPLACE the [url] value with your webhook url, this action will send all actifity to your webhook
     It send 3 value, token, key, and message. Do something action with your webhook.
+
+    If imageMessage or videoMessage using gif webhook will receive imageBase64 for your media // feature by request Liu Bei
 
 ## AUTOSTART INSTANCE
 
@@ -845,5 +849,9 @@ Share
 [Donation - Buy me a coffee](https://www.buymeacoffee.com/tofiknuryanto)
 
 [Ask me on telegram ( Sometime slow response, sorry I'mm hungry )](https://t.me/ndaludotid)
+
+Bank JAGO/Artos - 506443461704
+
+Other BANK by chat telegram
 
 Still updating every have a break time from my activity

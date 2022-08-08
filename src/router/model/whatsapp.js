@@ -3,7 +3,7 @@
 // const { default: makeWASocket, makeWALegacySocket, downloadContentFromMessage } = require('@adiwajshing/baileys')
 // const { useSingleFileAuthState, makeInMemoryStore, fetchLatestBaileysVersion, AnyMessageContent, delay, MessageRetryMap, useMultiFileAuthState } = require('@adiwajshing/baileys')
 // const { DisconnectReason } = require('@adiwajshing/baileys')
-const { default: makeWASocket, makeInMemoryStore, fetchLatestBaileysVersion, useMultiFileAuthState, DisconnectReason } = require('../../baileys/lib')
+const { default: makeWASocket, makeInMemoryStore, fetchLatestBaileysVersion, useMultiFileAuthState, downloadContentFromMessage, DisconnectReason } = require('../../baileys/lib')
 const QRCode = require('qrcode')
 
 const lib = require('../../lib')
@@ -241,22 +241,29 @@ const connectToWhatsApp = async (token, io) => {
                             const quotedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || undefined
                             const key = msg.key
                             const message = msg.message
+
+                            await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
+                            io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
+
+                            var dataSend = {
+                                token: token,
+                                key: key,
+                                message: message
+                            }
+
+                            if ( msg?.message?.imageMessage || msg?.message?.videoMessage) {
+                                dataSend.imageBase64 = await getImageBase64(token, msg)
+                            }
+
                             console.log('recv messages TOKEN: '+token)
                             console.log({
                                 token, id, pushName, messageType, text, contextInfo, quotedMessage, key, message
                             })
 
-                            await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
-                            io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
-
                             /** START WEBHOOK */
                             const url = process.env.WEBHOOK
                             if ( url ) {
-                                axios.post(url, {
-                                    token: token,
-                                    key: key,
-                                    message: message
-                                })
+                                axios.post(url, dataSend)
                                 .then(function (response) {
                                     if ( process.env.NODE_ENV === 'development' ) {
                                         console.log(`\n> RESPONSE FROM WEBHOOK`)
@@ -630,6 +637,27 @@ function clearConnection(token) {
         }
         console.log(`credentials/${token} is deleted`);
     });
+}
+
+async function getImageBase64(token, msg) {
+    // download stream
+    if ( msg.message.imageMessage ) {
+        var stream = await downloadContentFromMessage(msg.message.imageMessage, 'image')
+        var mimetype = msg.message.imageMessage.mimetype
+    } else {
+        var stream = await downloadContentFromMessage(msg.message.videoMessage, 'video')
+        var mimetype = msg.message.videoMessage.mimetype
+        if ( !msg.message.videoMessage.gifPlayback ) return false
+    }
+    let buffer = Buffer.from([])
+
+    // awaiting stream
+    for await(const chunk of stream) {
+        buffer = Buffer.concat([buffer, chunk])
+    }
+    // convert binary data to base64 encoded string
+    return `data:${mimetype};base64,${buffer.toString('base64')}`
+    // return 'data:image/png;base64,'+buffer.toString('base64');
 }
 
 module.exports = {
