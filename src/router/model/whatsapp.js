@@ -59,22 +59,22 @@ const connectToWhatsApp = async (token, io) => {
 
     // the store maintains the data of the WA connection in memory
     // can be written out to a file & read from it
-    const store = makeInMemoryStore({ logger })
-    store?.readFromFile(`credentials/${token}/multistore.js`)
+    // const store = makeInMemoryStore({ logger })
+    // store?.readFromFile(`credentials/${token}/multistore.js`)
     // {"chats":[],"contacts":{},"messages":{}}
 
     // interval
-    intervalStore[token] = setInterval(() => {
-        try {
-            store?.writeToFile(`credentials/${token}/multistore.js`)
-        } catch (error) {
-            console.log(error)
-        }
-    }, 10_000)
-    intervalConnCheck[token] = setInterval(async () => {
-        const check = await connectToWhatsApp(token, io)
-        console.log(`> Interval check connection TOKEN: ${token}`, check)
-    }, 1000 * 60 * 5)
+    // intervalStore[token] = setInterval(() => {
+    //     try {
+    //         store?.writeToFile(`credentials/${token}/multistore.js`)
+    //     } catch (error) {
+    //         console.log(error)
+    //     }
+    // }, 10_000)
+    // intervalConnCheck[token] = setInterval(async () => {
+    //     const check = await connectToWhatsApp(token, io)
+    //     console.log(`> Interval check connection TOKEN: ${token}`, check)
+    // }, 1000 * 60 * 5)
 
     sock[token] = makeWASocket({
         version,
@@ -87,25 +87,43 @@ const connectToWhatsApp = async (token, io) => {
         logger,
         printQRInTerminal: true,
         auth: state,
+        level: 'silent',
         msgRetryCounterMap,
         getMessage: async key => {
-			if(store) {
-				const msg = await store.loadMessage(key.remoteJid, key.id, undefined)
-				return msg?.message || undefined
-			}
-
-			// only if store is present
-			return {
-				conversation: 'Hello, this is resending message. But my message was lost. Please reply this message to tell me the message is lost.\n\nRegard web dev *ndalu.id*'
-			}
+            try {
+                let msg = await readJsonFromFile({token, name: 'messages'})
+                msg = msg.messages.filter( x => x.key.id === key.id)
+                winstonLog({tag: 'resend-message', token: token, json: {
+                    tag: 'resend-message',
+                    message: 'resend message',
+                    data: {
+                        token: token,
+                        msg: msg
+                    }
+                }})
+                return msg.message
+            } catch (error) {
+                winstonLog({tag: 'error', token: token, json: {
+                    tag: 'error-resend-message',
+                    message: 'error resend message',
+                    data: {
+                        token: token,
+                        error: error
+                    }
+                }})
+                return {
+                    conversation: 'Hello, this is resending message. But my message was lost. Please reply this message to tell me the message is lost.\n\nRegard web dev *ndalu.id*'
+                }
+            }
 		}
     })
 
-    store?.bind(sock[token].ev)
+    // store?.bind(sock[token].ev)
 
     sock[token].ev.process(
 		// events is a map for event name => event data
 		async(events) => {
+            // console.log(events)
 			// something about the connection changed
 			// maybe it closed, or we received all offline message or connection opened
 			if(events['connection.update']) {
@@ -196,188 +214,145 @@ const connectToWhatsApp = async (token, io) => {
 			}
 
 			if(events.call) {
-				console.log('recv call event', events.call)
+				// console.log('recv call event', events.call)
+                winstonLog({tag: 'call', token: token, json: {
+                    tag: 'call',
+                    message: 'chats set',
+                    data: {
+                        token: token,
+                        call: events.call
+                    }
+                }})
 			}
 
 			// chat history received
 			if(events['chats.set']) {
                 const { chats, isLatest } = events['chats.set']
-				console.log(`recv ${chats.length} chats (is latest: ${isLatest})`)
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
+				// console.log(`recv ${chats.length} chats (is latest: ${isLatest})`)
+                // winstonLog({tag: 'chats.set', token: token, json: {
+                //     tag: 'chats.set',
+                //     message: 'chats set',
+                //     data: {
+                //         token: token,
+                //         chatsSet: { chats, isLatest }
+                //     }
+                // }})
+                writeJsonToFile({token: token, name: 'chats', json: { chats, isLatest }})
 			}
 
 			// message history received
 			if(events['messages.set']) {
                 const { messages, isLatest } = events['messages.set']
-				console.log(`recv ${messages.length} messages (is latest: ${isLatest})`)
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
+				// console.log(`recv ${messages.length} messages (is latest: ${isLatest})`)
+                // winstonLog({tag: 'messages-set', token: token, json: {
+                //     tag: 'messages-set',
+                //     message: 'messages set',
+                //     data: {
+                //         token: token,
+                //         messagesSet: { messages, isLatest }
+                //     }
+                // }})
+                writeJsonToFile({token: token, name: 'messages', json: { messages, isLatest }})
+                console.log(messages.length.length)
 			}
 
 			if(events['contacts.set']) {
 				const { contacts, isLatest } = events['contacts.set']
-				console.log(`recv ${contacts.length} contacts (is latest: ${isLatest})`)
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
-                winston.info(`contacts-set - ${token} - ${JSON.stringify({
-                    tag: 'contacts-set',
-                    message: 'contacts set',
-                    data: {
-                        token: token,
-                        contacts: contacts
-                    }
-                })}`)
+				// console.log(`recv ${contacts.length} contacts (is latest: ${isLatest})`)
+                // winstonLog({tag: 'contacts-upsert', token: token, json: {
+                //     tag: 'contacts-upsert',
+                //     message: 'contacts upsert',
+                //     data: {
+                //         token: token,
+                //         contactsSet: { contacts, isLatest }
+                //     }
+                // }})
+                writeJsonToFile({token: token, name: 'contacts', json: { contacts, isLatest }})
 			}
 
 			// received a new message
 			if(events['messages-upsert']) {
-				const upsert = events['messages.upsert']
-                await store.loadMessage(upsert.messages[0].key.remoteJid, upsert.messages[0].key.id)
-
-                winston.info(`messages-upsert - ${token} - ${JSON.stringify({
-                    tag: 'messages-upsert',
-                    message: 'messages upsert',
-                    data: {
-                        token: token,
-                        upsert: upsert
-                    }
-                })}`)
-
-				if(upsert.type === 'notify') {
-					for(const msg of upsert.messages) {
-						// if(!msg.key.fromMe && doReplies) {
-						if(!msg.key.fromMe && msg.key.remoteJid !== 'status@broadcast') {
-							// console.log('replying to', msg.key.remoteJid)
-							// await sock!.sendReadReceipt(msg.key.remoteJid!, msg.key.participant!, [msg.key.id!])
-							// await sendMessageWTyping({ text: 'Hello there!' }, msg.key.remoteJid!)
-                            // store?.writeToFile(`credentials/${token}/multistore.js`)
-
-                            const id = msg.key.remoteJid
-                            const pushName = msg.pushName
-                            const messageType = Object.keys (msg.message)[0]
-                            const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || undefined
-                            const contextInfo = msg.message?.extendedTextMessage?.contextInfo || undefined
-                            const quotedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || undefined
-                            const key = msg.key
-                            const message = msg.message
-
-                            await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
-                            io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
-
-                            var dataSend = {
-                                token: token,
-                                key: key,
-                                message: message
-                            }
-
-                            if ( msg?.message?.imageMessage || msg?.message?.videoMessage) {
-                                dataSend.imageBase64 = await getImageBase64(token, msg)
-                            }
-
-                            console.log('recv messages TOKEN: '+token)
-                            console.log({
-                                token, id, pushName, messageType, text, contextInfo, quotedMessage, key, message
-                            })
-
-                            /** START WEBHOOK */
-                            const url = process.env.WEBHOOK
-                            if ( url ) {
-                                axios.post(url, dataSend)
-                                .then(function (response) {
-                                    if ( process.env.NODE_ENV === 'development' ) {
-                                        console.log(`\n> RESPONSE FROM WEBHOOK`)
-                                        console.log(response.data)
-                                    }
-                                })
-                                .catch(function (error) {
-                                    console.log(error)
-                                });
-                            }
-                            /** END WEBHOOK */
-						}
-					}
-				}
-
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
+                manageIncomingMessage({token, upsert: events['messages.upsert'], io})
 			}
 
 			// messages updated like status delivered, message deleted etc.
 			if(events['messages.update']) {
 				// console.log('messages update ', events['messages.update'])
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
-                winston.info(`messages-update - ${token} - ${JSON.stringify({
+                winstonLog({tag: 'messages-update', token: token, json: {
                     tag: 'messages-update',
                     message: 'messages update',
                     data: {
                         token: token,
-                        update: events['messages.update']
+                        messagesUpdate: events['messages.update']
                     }
-                })}`)
+                }})
 			}
 
 			if(events['message-receipt.update']) {
-				console.log('message receipt update ', events['message-receipt.update'])
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
-                winston.info(`message-receipt.update - ${token} - ${JSON.stringify({
+				// console.log('message receipt update ', events['message-receipt.update'])
+                winstonLog({tag: 'message-receipt.update', token: token, json: {
                     tag: 'message-receipt.update',
                     message: 'message receipt update',
                     data: {
                         token: token,
-                        update: events['message-receipt.update']
+                        messageReceiptUpdate: events['message-receipt.update']
                     }
-                })}`)
+                }})
 			}
 
 			if(events['messages.reaction']) {
-				console.log('messages reaction', events['messages.reaction'])
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
-                winston.info(`messages-reaction - ${token} - ${JSON.stringify({
+				// console.log('messages reaction', events['messages.reaction'])
+                winstonLog({tag: 'messages-reaction', token: token, json: {
                     tag: 'messages-reaction',
                     message: 'messages reaction',
                     data: {
                         token: token,
-                        update: events['messages.reaction']
+                        messagesReaction: events['messages.reaction']
                     }
-                })}`)
+                }})
 			}
 
 			if(events['presence.update']) {
-				console.log('presence.update', events['presence.update'])
-                winston.info(`messages-reaction - ${token} - ${JSON.stringify({
-                    tag: 'messages-reaction',
+				// console.log('presence.update', events['presence.update'])
+                winstonLog({tag: 'presence.update', token: token, json: {
+                    tag: 'presence.update',
                     message: 'messages reaction',
                     data: {
                         token: token,
-                        update: events['messages.reaction']
+                        presenceUpdate: events['presence.update']
                     }
-                })}`)
+                }})
 			}
 
 			if(events['chats.update']) {
 				// console.log('chats update ', events['chats.update'])
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
-                winston.info(`chats-update - ${token} - ${JSON.stringify({
+                winstonLog({tag: 'chats-update', token: token, json: {
                     tag: 'chats-update',
                     message: 'chats update',
                     data: {
                         token: token,
-                        update: events['chats.update']
+                        chatsUpdate: events['chats.update']
                     }
-                })}`)
+                }})
 			}
 
 			if(events['chats.delete']) {
-				console.log('chats deleted ', events['chats.delete'])
-                // store?.writeToFile(`credentials/${token}/multistore.js`)
-                winston.info(`chats-delete - ${token} - ${JSON.stringify({
+				// console.log('chats deleted ', events['chats.delete'])
+                winstonLog({tag: 'chats-delete', token: token, json: {
                     tag: 'chats-delete',
                     message: 'chats delete',
                     data: {
                         token: token,
-                        update: events['chats.delete']
+                        chatsDelete: events['chats.delete']
                     }
-                })}`)
+                }})
 			}
 		}
 	)
+
+    sock[token].ev.on('messages.upsert', m => {
+        manageIncomingMessage({token, upsert: m, io})
+    })
 
     return {
         sock: sock[token],
@@ -420,6 +395,14 @@ async function sendText(token, number, text) {
         }
     } catch (error) {
         console.log(error)
+        winstonLog({tag: 'error', token: token, json: {
+            tag: 'error-sendText',
+            message: 'error send text',
+            data: {
+                token: token,
+                error: error
+            }
+        }})
         return false
     }
 
@@ -702,6 +685,7 @@ function deleteCredentials(token) {
     }
 }
 
+/** HELPER */
 async function getChromeLates() {
     const req = await axios.get('https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/stable/versions')
     return req
@@ -743,6 +727,100 @@ async function getImageBase64(token, msg) {
 
 function winstonLog({tag, token, json}) {
     winston.info(`${tag} - ${token} - ${JSON.stringify(json)}`)
+}
+
+function writeJsonToFile({token, name, json}) {
+    const path = `credentials/${token}/${name}.json`
+    if  ( fs.existsSync(path) ) {
+        var arr = JSON.parse(fs.readFileSync(path))
+        if ( name === 'messages') {
+            json = {
+                messages: [...arr.messages, ...json.messages],
+                isLatest: json.isLatest
+            }
+        } else if ( name === 'chats') {
+            json = {
+                chats: [...arr.chats, ...json.chats],
+                isLatest: json.isLatest
+            }
+        } else if ( name === 'contacts') {
+            json = {
+                contacts: [...arr.contacts, ...json.contacts],
+                isLatest: json.isLatest
+            }
+        }
+    }
+    fs.writeFileSync(path, JSON.stringify(json))
+}
+
+function readJsonFromFile({token, name}) {
+    const path = `credentials/${token}/${name}.json`
+    if  ( fs.existsSync(path) ) {
+        return {
+            name: name,
+            json: JSON.parse(fs.readFileSync(path))
+        }
+    }
+    return {
+        name: name,
+        json: []
+    }
+}
+
+async function manageIncomingMessage({token, upsert, io}) {
+    upsert.isLatest = true
+    writeJsonToFile({token, name: 'messages', json: upsert})
+    // console.log( upsert.messages )
+    if(upsert.type === 'notify') {
+        for(const msg of upsert.messages) {
+            // if(!msg.key.fromMe && doReplies) {
+            if(!msg.key.fromMe && msg.key.remoteJid !== 'status@broadcast') {
+
+                const id = msg.key.remoteJid
+                const pushName = msg.pushName
+                const messageType = Object.keys (msg.message)[0]
+                const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || undefined
+                const contextInfo = msg.message?.extendedTextMessage?.contextInfo || undefined
+                const quotedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || undefined
+                const key = msg.key
+                const message = msg.message
+
+                await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
+                io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
+
+                var dataSend = {
+                    token: token,
+                    key: key,
+                    message: message
+                }
+
+                if ( msg?.message?.imageMessage || msg?.message?.videoMessage) {
+                    dataSend.imageBase64 = await getImageBase64(token, msg)
+                }
+
+                console.log('recv messages TOKEN: '+token)
+                console.log({
+                    token, id, pushName, messageType, text, contextInfo, quotedMessage, key, message
+                })
+
+                /** START WEBHOOK */
+                const url = process.env.WEBHOOK
+                if ( url ) {
+                    axios.post(url, dataSend)
+                    .then(function (response) {
+                        if ( process.env.NODE_ENV === 'development' ) {
+                            console.log(`\n> RESPONSE FROM WEBHOOK`)
+                            console.log(response.data)
+                        }
+                    })
+                    .catch(function (error) {
+                        console.log(error)
+                    });
+                }
+                /** END WEBHOOK */
+            }
+        }
+    }
 }
 
 module.exports = {

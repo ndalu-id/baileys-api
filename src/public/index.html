@@ -93,26 +93,31 @@
             e.preventDefault()
             document.querySelector('#form-send').setAttribute('style', 'block')
             const token = document.querySelector('input[name="token"]')
-            if (token.value) {
-                checkToken.value = token.value
-                const req = await fetch('/api/whatsapp/create-instance', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' // don'texpo
-                    },
-                    body: JSON.stringify({token: token.value})
-                })
-                // result as json
-                const res = await req.json()
-                if (res.qrcode) { // if result has qrcode
-                    qrcode.src = res.qrcode // set element image src to res.qrcode
-                }
-                // diplay result to prompter
-                return pre.innerHTML = JSON.stringify(res, undefined, 2)
+            if ( !token.value ) return
+            const res = await startConnection(token)
+            if (res.qrcode) { // if result has qrcode
+                qrcode.src = res.qrcode // set element image src to res.qrcode
             }
-            pre.innerHTML = JSON.stringify({message: 'Token must not be empty'}, undefined, 2)
+            // diplay result to prompter
+            return pre.innerHTML = JSON.stringify(res, undefined, 2)
         })
+
+        async function startConnection() {
+            checkToken.value = token.value
+            const req = await fetch('/api/whatsapp/create-instance', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic TmRhbHUtc2VydmVyLXVVZGtmZ2xpNzgzcGtmbmxhc2tvZ29pZ2hyOg==' // don'texpo
+                },
+                body: JSON.stringify({token: token.value})
+            })
+            // result as json
+            const res = await req.json()
+            return res
+        }
+
+        document.addEventListener('DOMContentLoaded', startConnection);
 
         // delete token / delete instance
         const deleteToken = document.querySelector('.delete-token')
@@ -164,6 +169,21 @@
             }
         }
 
+        // DOM LOADED
+        (async () => {
+            const token = document.querySelector('#token')
+            if ( token.value ) {
+                const req = await fetch('/api/whatsapp/get-profile-picture', {
+                    method: 'POST',
+                    headers: {
+                        'content-Type': 'application/json'
+                    },
+                    // getPpUrl(token, number, highrest)
+                    body: JSON.stringify({token})
+                })
+            }
+        })
+
         // CONSUME SOCKET IO CLIENT SIDE START
         // to receiving message from server
         socket.on('message', (data) => {
@@ -202,6 +222,7 @@
                 qrcode.src = data.ppUrl
             }
         })
+        
         // when request qrcode time out
         socket.on('timeout', (data) => {
             // Check if token is same with te data.token, show the qrcode
@@ -210,6 +231,7 @@
                 qrcode.src = "https://ndalu.id/favicon.png"
             }
         })
+        
         // when device removed
         socket.on('timeout', (data) => {
             // Check if token is same with te data.token, show the qrcode
