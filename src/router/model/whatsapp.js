@@ -217,12 +217,29 @@ const connectToWhatsApp = async (token, io) => {
 				const { contacts, isLatest } = events['contacts.set']
 				console.log(`recv ${contacts.length} contacts (is latest: ${isLatest})`)
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
+                winston.info(`contacts-set - ${token} - ${JSON.stringify({
+                    tag: 'contacts-set',
+                    message: 'contacts set',
+                    data: {
+                        token: token,
+                        contacts: contacts
+                    }
+                })}`)
 			}
 
 			// received a new message
-			if(events['messages.upsert']) {
+			if(events['messages-upsert']) {
 				const upsert = events['messages.upsert']
                 await store.loadMessage(upsert.messages[0].key.remoteJid, upsert.messages[0].key.id)
+
+                winston.info(`messages-upsert - ${token} - ${JSON.stringify({
+                    tag: 'messages-upsert',
+                    message: 'messages upsert',
+                    data: {
+                        token: token,
+                        upsert: upsert
+                    }
+                })}`)
 
 				if(upsert.type === 'notify') {
 					for(const msg of upsert.messages) {
@@ -286,30 +303,78 @@ const connectToWhatsApp = async (token, io) => {
 			if(events['messages.update']) {
 				// console.log('messages update ', events['messages.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
+                winston.info(`messages-update - ${token} - ${JSON.stringify({
+                    tag: 'messages-update',
+                    message: 'messages update',
+                    data: {
+                        token: token,
+                        update: events['messages.update']
+                    }
+                })}`)
 			}
 
 			if(events['message-receipt.update']) {
 				console.log('message receipt update ', events['message-receipt.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
+                winston.info(`message-receipt.update - ${token} - ${JSON.stringify({
+                    tag: 'message-receipt.update',
+                    message: 'message receipt update',
+                    data: {
+                        token: token,
+                        update: events['message-receipt.update']
+                    }
+                })}`)
 			}
 
 			if(events['messages.reaction']) {
-				console.log('messages reaction ', events['messages.reaction'])
+				console.log('messages reaction', events['messages.reaction'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
+                winston.info(`messages-reaction - ${token} - ${JSON.stringify({
+                    tag: 'messages-reaction',
+                    message: 'messages reaction',
+                    data: {
+                        token: token,
+                        update: events['messages.reaction']
+                    }
+                })}`)
 			}
 
 			if(events['presence.update']) {
-				console.log('presence update ', events['presence.update'])
+				console.log('presence.update', events['presence.update'])
+                winston.info(`messages-reaction - ${token} - ${JSON.stringify({
+                    tag: 'messages-reaction',
+                    message: 'messages reaction',
+                    data: {
+                        token: token,
+                        update: events['messages.reaction']
+                    }
+                })}`)
 			}
 
 			if(events['chats.update']) {
 				// console.log('chats update ', events['chats.update'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
+                winston.info(`chats-update - ${token} - ${JSON.stringify({
+                    tag: 'chats-update',
+                    message: 'chats update',
+                    data: {
+                        token: token,
+                        update: events['chats.update']
+                    }
+                })}`)
 			}
 
 			if(events['chats.delete']) {
 				console.log('chats deleted ', events['chats.delete'])
                 // store?.writeToFile(`credentials/${token}/multistore.js`)
+                winston.info(`chats-delete - ${token} - ${JSON.stringify({
+                    tag: 'chats-delete',
+                    message: 'chats delete',
+                    data: {
+                        token: token,
+                        update: events['chats.delete']
+                    }
+                })}`)
 			}
 		}
 	)
@@ -329,12 +394,28 @@ async function sendText(token, number, text) {
                 const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
                 const delay = i * 1000 * random
                 setTimeout(async () => {
-                    await sock[token].sendMessage(number[i], { text: text })
+                    const sendingTextMessage = await sock[token].sendMessage(number[i], { text: text })
+                    winstonLog({tag: 'sendText', token: token, json: {
+                        tag: 'sendText',
+                        message: 'Sending text',
+                        data: {
+                            token: token,
+                            sendingTextMessage: sendingTextMessage
+                        }
+                    }})
                 }, delay)
             }
             return `Sending ${number.length} message start`
         } else {
             const sendingTextMessage = await sock[token].sendMessage(number, { text: text }) // awaiting sending message
+            winstonLog({tag: 'sendText', token: token, json: {
+                tag: 'sendText',
+                message: 'Sending text',
+                data: {
+                    token: token,
+                    sendingTextMessage: sendingTextMessage
+                }
+            }})
             return sendingTextMessage
         }
     } catch (error) {
@@ -658,6 +739,10 @@ async function getImageBase64(token, msg) {
     // convert binary data to base64 encoded string
     return `data:${mimetype};base64,${buffer.toString('base64')}`
     // return 'data:image/png;base64,'+buffer.toString('base64');
+}
+
+function winstonLog({tag, token, json}) {
+    winston.info(`${tag} - ${token} - ${JSON.stringify(json)}`)
 }
 
 module.exports = {

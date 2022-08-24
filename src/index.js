@@ -16,6 +16,7 @@ if ( !fs.existsSync('credentials') ) {
 require('dotenv').config()
 const lib = require('./lib')
 global.log = lib.log
+global.winston = lib.winston
 
 /**
  * CHECK THE .ENV FIRST
@@ -87,13 +88,29 @@ function autostartInstance() {
     token = token.map( x => x.split('.')[0])
 
     // looping credentials to reconnecting
-    lib.log.info(`Found ${token.length} credential${token.length > 1 ? '\'s' : ''}`)
+    log.info(`Found ${token.length} credential${token.length > 1 ? '\'s' : ''}`)
     for ( let i = 0; i < token.length; i++ ) {
         const delay = i * 2000 // set delay 2 second each credentials. You can edit here for the delay
         setTimeout(async() => {
-            lib.log.info(`Reconnecting session ${token[i]}`)
-            await wa.connectToWhatsApp(token[i], io).catch(err => lib.log.error(err))
-            scheduler.autostartScheduler(token[i])
+            log.info(`Reconnecting session ${token[i]}`)
+
+            let connect
+            try {
+                connect = await wa.connectToWhatsApp(token[i], io)
+                scheduler.autostartScheduler(token[i])
+            } catch (error) {
+                connect = error
+            }
+
+            winston.info(`autostart - ${token[i]} - ${JSON.stringify({
+                tag: 'autostart',
+                message: 'System autostart by nDalu.id',
+                data: {
+                    token: token[i],
+                    connect: connect
+                }
+            })}`)
+
         }, delay)
     }
 

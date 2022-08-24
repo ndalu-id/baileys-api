@@ -1,9 +1,11 @@
 'use strict'
 
 const logger = require('./pino')
+const winston = require('./winston')
 
 const lib = {
-    log: logger
+    log: logger,
+    winston: winston
 }
 
 module.exports = lib
