@@ -14,6 +14,7 @@
         "libsignal": "git+https://github.com/adiwajshing/libsignal-node",
         "link-preview-js": "^2.1.19",
         "music-metadata": "^8.0.1",
+        "mysql": "^2.18.1",
         "node-cache": "^5.1.2",
         "node-cron": "^3.0.1",
         "pino": "^8.1.0",
@@ -24,6 +25,8 @@
         "sharp": "^0.30.7",
         "socket.io": "^4.5.1",
         "uuid": "^8.3.2",
+        "winston": "^3.8.1",
+        "winston-daily-rotate-file": "^4.7.1",
         "ws": "^8.8.1"
     }
 
@@ -37,11 +40,9 @@ Demo visit here [ndalu-wa.herokuapp.com](https://ndalu-wa.herokuapp.com/)
 
 ## TODO
 
-    - do update scheduler.json ✔️
-    - do reload cron every update scheduler ✔️
-    - do type and data post to add scheduler ✔️
-    - download media 🔥🔥🔥
-    - group API 🔥🔥🔥
+    - download media ✔️
+    - log to file every actifity (will input into database chat, will make app lighter) 🔥🔥🔥✔️✔️
+    - group API (after mysql done) 🔥🔥🔥
 
 ## UPDATE
 
