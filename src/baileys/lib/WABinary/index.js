@@ -19,4 +19,3 @@ __exportStar(require("./decode"), exports);
 __exportStar(require("./generic-utils"), exports);
 __exportStar(require("./jid-utils"), exports);
 __exportStar(require("./types"), exports);
-__exportStar(require("./Legacy"), exports);

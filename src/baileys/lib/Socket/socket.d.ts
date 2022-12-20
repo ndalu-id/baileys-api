@@ -8,14 +8,15 @@ import { BinaryNode } from '../WABinary';
  * - listen to messages and emit events
  * - query phone connection
  */
-export declare const makeSocket: ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout }: SocketConfig) => {
+export declare const makeSocket: ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout, options, }: SocketConfig) => {
     type: "md";
     ws: WebSocket;
     ev: import("../Types").BaileysEventEmitter & {
-        process(handler: (events: Partial<import("../Types").BaileysEventMap<import("../Types").AuthenticationCreds>>) => void | Promise<void>): () => void;
-        buffer(): boolean;
-        flush(): Promise<void>;
-        processInBuffer(task: Promise<any>): any;
+        process(handler: (events: Partial<import("../Types").BaileysEventMap>) => void | Promise<void>): () => void;
+        buffer(): void;
+        createBufferedFunction<A extends any[], T>(work: (...args: A) => Promise<T>): (...args: A) => Promise<T>;
+        flush(force?: boolean | undefined): boolean;
+        isBuffering(): boolean;
     };
     authState: {
         creds: import("../Types").AuthenticationCreds;
@@ -28,10 +29,11 @@ export declare const makeSocket: ({ waWebSocketUrl, connectTimeoutMs, logger, ag
     waitForSocketOpen: () => Promise<void>;
     sendRawMessage: (data: Uint8Array | Buffer) => Promise<void>;
     sendNode: (frame: BinaryNode) => Promise<void>;
-    logout: () => Promise<void>;
+    logout: (msg?: string) => Promise<void>;
     end: (error: Error | undefined) => void;
     onUnexpectedError: (error: Error, msg: string) => void;
     uploadPreKeys: (count?: number) => Promise<void>;
+    uploadPreKeysToServerIfRequired: () => Promise<void>;
     /** Waits for the connection to WA to reach a state */
     waitForConnectionUpdate: (check: (u: Partial<import("../Types").ConnectionState>) => boolean | undefined, timeoutMs?: number | undefined) => Promise<void>;
 };

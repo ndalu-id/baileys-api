@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.patchMessageForMdIfRequired = exports.assertMediaContent = exports.downloadMediaMessage = exports.aggregateMessageKeysNotFromMe = exports.updateMessageWithReaction = exports.updateMessageWithReceipt = exports.getDevice = exports.extractMessageContent = exports.normalizeMessageContent = exports.getContentType = exports.generateWAMessage = exports.generateWAMessageFromContent = exports.generateWAMessageContent = exports.generateForwardMessageContent = exports.prepareDisappearingMessageSettingContent = exports.prepareWAMessageMedia = exports.generateLinkPreviewIfRequired = exports.extractUrlFromText = void 0;
+exports.assertMediaContent = exports.downloadMediaMessage = exports.aggregateMessageKeysNotFromMe = exports.updateMessageWithReaction = exports.updateMessageWithReceipt = exports.getDevice = exports.extractMessageContent = exports.normalizeMessageContent = exports.getContentType = exports.generateWAMessage = exports.generateWAMessageFromContent = exports.generateWAMessageContent = exports.generateForwardMessageContent = exports.prepareDisappearingMessageSettingContent = exports.prepareWAMessageMedia = exports.generateLinkPreviewIfRequired = exports.extractUrlFromText = void 0;
 const boom_1 = require("@hapi/boom");
 const axios_1 = __importDefault(require("axios"));
 const fs_1 = require("fs");
@@ -19,8 +19,7 @@ const MIMETYPE_MAP = {
     document: 'application/pdf',
     audio: 'audio/ogg; codecs=opus',
     sticker: 'image/webp',
-    history: 'application/x-protobuf',
-    'md-app-state': 'application/x-protobuf',
+    'product-catalog-image': 'image/jpeg',
 };
 const MessageTypeProto = {
     'image': Types_1.WAProto.Message.ImageMessage,
@@ -97,12 +96,9 @@ const prepareWAMessageMedia = async (message, options) => {
     const requiresThumbnailComputation = (mediaType === 'image' || mediaType === 'video') &&
         (typeof uploadData['jpegThumbnail'] === 'undefined');
     const requiresOriginalForSomeProcessing = requiresDurationComputation || requiresThumbnailComputation;
-    const { mediaKey, encWriteStream, bodyPath, fileEncSha256, fileSha256, fileLength, didSaveToTmpPath } = await (0, messages_media_1.encryptedStream)(uploadData.media, mediaType, requiresOriginalForSomeProcessing);
+    const { mediaKey, encWriteStream, bodyPath, fileEncSha256, fileSha256, fileLength, didSaveToTmpPath } = await (0, messages_media_1.encryptedStream)(uploadData.media, options.mediaTypeOverride || mediaType, requiresOriginalForSomeProcessing);
     // url safe Base64 encode the SHA256 hash of the body
-    const fileEncSha256B64 = encodeURIComponent(fileEncSha256.toString('base64')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/\=+$/, ''));
+    const fileEncSha256B64 = fileEncSha256.toString('base64');
     const [{ mediaUrl, directPath }] = await Promise.all([
         (async () => {
             const result = await options.upload(encWriteStream, { fileEncSha256B64, mediaType, timeoutMs: options.mediaUploadTimeoutMs });
@@ -112,7 +108,13 @@ const prepareWAMessageMedia = async (message, options) => {
         (async () => {
             try {
                 if (requiresThumbnailComputation) {
-                    uploadData.jpegThumbnail = await (0, messages_media_1.generateThumbnail)(bodyPath, mediaType, options);
+                    const { thumbnail, originalImageDimensions } = await (0, messages_media_1.generateThumbnail)(bodyPath, mediaType, options);
+                    uploadData.jpegThumbnail = thumbnail;
+                    if (!uploadData.width && originalImageDimensions) {
+                        uploadData.width = originalImageDimensions.width;
+                        uploadData.height = originalImageDimensions.height;
+                        logger === null || logger === void 0 ? void 0 : logger.debug('set dimensions');
+                    }
                     logger === null || logger === void 0 ? void 0 : logger.debug('generated thumbnail');
                 }
                 if (requiresDurationComputation) {
@@ -215,6 +217,16 @@ const generateWAMessageContent = async (message, options) => {
             extContent.description = urlInfo.description;
             extContent.title = urlInfo.title;
             extContent.previewType = 0;
+            const img = urlInfo.highQualityThumbnail;
+            if (img) {
+                extContent.thumbnailDirectPath = img.directPath;
+                extContent.mediaKey = img.mediaKey;
+                extContent.mediaKeyTimestamp = img.mediaKeyTimestamp;
+                extContent.thumbnailWidth = img.width;
+                extContent.thumbnailHeight = img.height;
+                extContent.thumbnailSha256 = img.fileSha256;
+                extContent.thumbnailEncSha256 = img.fileEncSha256;
+            }
         }
         m.extendedTextMessage = extContent;
     }
@@ -271,6 +283,19 @@ const generateWAMessageContent = async (message, options) => {
                 };
                 break;
         }
+    }
+    else if ('product' in message) {
+        const { imageMessage } = await (0, exports.prepareWAMessageMedia)({ image: message.product.productImage }, options);
+        m.productMessage = Types_1.WAProto.Message.ProductMessage.fromObject({
+            ...message,
+            product: {
+                ...message.product,
+                productImage: imageMessage,
+            }
+        });
+    }
+    else if ('listReply' in message) {
+        m.listResponseMessage = { ...message.listReply };
     }
     else {
         m = await (0, exports.prepareWAMessageMedia)(message, options);
@@ -426,10 +451,11 @@ exports.getContentType = getContentType;
  * @returns
  */
 const normalizeMessageContent = (content) => {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     content = ((_c = (_b = (_a = content === null || content === void 0 ? void 0 : content.ephemeralMessage) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.viewOnceMessage) === null || _c === void 0 ? void 0 : _c.message) ||
         ((_d = content === null || content === void 0 ? void 0 : content.ephemeralMessage) === null || _d === void 0 ? void 0 : _d.message) ||
         ((_e = content === null || content === void 0 ? void 0 : content.viewOnceMessage) === null || _e === void 0 ? void 0 : _e.message) ||
+        ((_f = content === null || content === void 0 ? void 0 : content.documentWithCaptionMessage) === null || _f === void 0 ? void 0 : _f.message) ||
         content ||
         undefined;
     return content;
@@ -455,7 +481,11 @@ const extractMessageContent = (content) => {
             return { locationMessage: msg.locationMessage };
         }
         else {
-            return { conversation: 'contentText' in msg ? msg.contentText : ('hydratedContentText' in msg ? msg.hydratedContentText : '') };
+            return {
+                conversation: 'contentText' in msg
+                    ? msg.contentText
+                    : ('hydratedContentText' in msg ? msg.hydratedContentText : '')
+            };
         }
     };
     content = (0, exports.normalizeMessageContent)(content);
@@ -556,18 +586,29 @@ const downloadMediaMessage = async (message, type, options, ctx) => {
             throw new boom_1.Boom('No message present', { statusCode: 400, data: message });
         }
         const contentType = (0, exports.getContentType)(mContent);
-        const mediaType = contentType === null || contentType === void 0 ? void 0 : contentType.replace('Message', '');
+        let mediaType = contentType === null || contentType === void 0 ? void 0 : contentType.replace('Message', '');
         const media = mContent[contentType];
-        if (!media || typeof media !== 'object' || !('url' in media)) {
+        if (!media || typeof media !== 'object' || (!('url' in media) && !('thumbnailDirectPath' in media))) {
             throw new boom_1.Boom(`"${contentType}" message is not a media message`);
         }
-        const stream = await (0, messages_media_1.downloadContentFromMessage)(media, mediaType, options);
+        let download;
+        if ('thumbnailDirectPath' in media && !('url' in media)) {
+            download = {
+                directPath: media.thumbnailDirectPath,
+                mediaKey: media.mediaKey
+            };
+            mediaType = 'thumbnail-link';
+        }
+        else {
+            download = media;
+        }
+        const stream = await (0, messages_media_1.downloadContentFromMessage)(download, mediaType, options);
         if (type === 'buffer') {
-            let buffer = Buffer.from([]);
+            const bufferArray = [];
             for await (const chunk of stream) {
-                buffer = Buffer.concat([buffer, chunk]);
+                bufferArray.push(chunk);
             }
-            return buffer;
+            return Buffer.concat(bufferArray);
         }
         return stream;
     }
@@ -587,31 +628,3 @@ const assertMediaContent = (content) => {
     return mediaContent;
 };
 exports.assertMediaContent = assertMediaContent;
-const generateContextInfo = () => {
-    const info = {
-        deviceListMetadataVersion: 2,
-        deviceListMetadata: {}
-    };
-    return info;
-};
-/**
- * this is an experimental patch to make buttons work
- * Don't know how it works, but it does for now
- */
-const patchMessageForMdIfRequired = (message) => {
-    const requiresPatch = !!(message.buttonsMessage
-        || message.templateMessage
-        || message.listMessage);
-    if (requiresPatch) {
-        message = {
-            viewOnceMessage: {
-                message: {
-                    messageContextInfo: generateContextInfo(),
-                    ...message
-                }
-            }
-        };
-    }
-    return message;
-};
-exports.patchMessageForMdIfRequired = patchMessageForMdIfRequired;

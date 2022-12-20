@@ -160,7 +160,6 @@ const encodeBinaryNode = ({ tag, attrs, content }, opts = constants, buffer = [0
         return true;
     };
     const writeString = (str) => {
-        // console.log('before write of ', str, ' ', Buffer.from(buffer).toString('hex'))
         const tokenIndex = TOKEN_MAP[str];
         if (tokenIndex) {
             if (typeof tokenIndex.dict === 'number') {
@@ -197,7 +196,7 @@ const encodeBinaryNode = ({ tag, attrs, content }, opts = constants, buffer = [0
         }
     };
     const validAttributes = Object.keys(attrs).filter(k => (typeof attrs[k] !== 'undefined' && attrs[k] !== null));
-    writeListStart(2 * validAttributes.length + 1 + (typeof content !== 'undefined' && content !== null ? 1 : 0));
+    writeListStart(2 * validAttributes.length + 1 + (typeof content !== 'undefined' ? 1 : 0));
     writeString(tag);
     for (const key of validAttributes) {
         if (typeof attrs[key] === 'string') {
@@ -215,12 +214,10 @@ const encodeBinaryNode = ({ tag, attrs, content }, opts = constants, buffer = [0
     else if (Array.isArray(content)) {
         writeListStart(content.length);
         for (const item of content) {
-            if (item) {
-                (0, exports.encodeBinaryNode)(item, opts, buffer);
-            }
+            (0, exports.encodeBinaryNode)(item, opts, buffer);
         }
     }
-    else if (typeof content === 'undefined' || content === null) {
+    else if (typeof content === 'undefined') {
         // do nothing
     }
     else {

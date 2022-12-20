@@ -1,7 +1,8 @@
 /// <reference types="node" />
+import { AxiosRequestConfig } from 'axios';
 import { Logger } from 'pino';
 import { proto } from '../../WAProto';
-import { BaileysEventMap, CommonBaileysEventEmitter, WACallUpdateType, WAVersion } from '../Types';
+import { BaileysEventEmitter, BaileysEventMap, WACallUpdateType, WAVersion } from '../Types';
 import { BinaryNode } from '../WABinary';
 export declare const Browsers: {
     ubuntu: (browser: any) => [string, string, string];
@@ -36,14 +37,14 @@ export declare const delayCancellable: (ms: number) => {
 };
 export declare function promiseTimeout<T>(ms: number | undefined, promise: (resolve: (v?: T) => void, reject: (error: any) => void) => void): Promise<T | undefined>;
 export declare const generateMessageID: () => string;
-export declare function bindWaitForEvent<T extends keyof BaileysEventMap<any>>(ev: CommonBaileysEventEmitter<any>, event: T): (check: (u: BaileysEventMap<any>[T]) => boolean | undefined, timeoutMs?: number) => Promise<void>;
-export declare const bindWaitForConnectionUpdate: (ev: CommonBaileysEventEmitter<any>) => (check: (u: Partial<import("../Types").ConnectionState>) => boolean | undefined, timeoutMs?: number) => Promise<void>;
-export declare const printQRIfNecessaryListener: (ev: CommonBaileysEventEmitter<any>, logger: Logger) => void;
+export declare function bindWaitForEvent<T extends keyof BaileysEventMap>(ev: BaileysEventEmitter, event: T): (check: (u: BaileysEventMap[T]) => boolean | undefined, timeoutMs?: number) => Promise<void>;
+export declare const bindWaitForConnectionUpdate: (ev: BaileysEventEmitter) => (check: (u: Partial<import("../Types").ConnectionState>) => boolean | undefined, timeoutMs?: number) => Promise<void>;
+export declare const printQRIfNecessaryListener: (ev: BaileysEventEmitter, logger: Logger) => void;
 /**
  * utility that fetches latest baileys version from the master branch.
  * Use to ensure your WA connection is always on the latest version
  */
-export declare const fetchLatestBaileysVersion: () => Promise<{
+export declare const fetchLatestBaileysVersion: (options?: AxiosRequestConfig<any>) => Promise<{
     version: WAVersion;
     isLatest: boolean;
     error?: undefined;
@@ -56,7 +57,7 @@ export declare const fetchLatestBaileysVersion: () => Promise<{
  * A utility that fetches the latest web version of whatsapp.
  * Use to ensure your WA connection is always on the latest version
  */
-export declare const fetchLatestWaWebVersion: () => Promise<{
+export declare const fetchLatestWaWebVersion: (options: AxiosRequestConfig<any>) => Promise<{
     version: WAVersion;
     isLatest: boolean;
     error?: undefined;
@@ -87,3 +88,4 @@ export declare const getCodeFromWSError: (error: Error) => number;
  * @param platform AuthenticationCreds.platform
  */
 export declare const isWABusinessPlatform: (platform: string) => boolean;
+export declare function trimUndefineds(obj: any): any;

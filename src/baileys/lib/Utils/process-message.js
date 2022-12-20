@@ -5,11 +5,14 @@ const WAProto_1 = require("../../WAProto");
 const Types_1 = require("../Types");
 const Utils_1 = require("../Utils");
 const WABinary_1 = require("../WABinary");
-const MSG_MISSED_CALL_TYPES = new Set([
+const REAL_MSG_STUB_TYPES = new Set([
     Types_1.WAMessageStubType.CALL_MISSED_GROUP_VIDEO,
     Types_1.WAMessageStubType.CALL_MISSED_GROUP_VOICE,
     Types_1.WAMessageStubType.CALL_MISSED_VIDEO,
     Types_1.WAMessageStubType.CALL_MISSED_VOICE
+]);
+const REAL_MSG_REQ_ME_STUB_TYPES = new Set([
+    Types_1.WAMessageStubType.GROUP_PARTICIPANT_ADD
 ]);
 /** Cleans a received message to further processing */
 const cleanMessage = (message, meId) => {
@@ -38,59 +41,64 @@ const cleanMessage = (message, meId) => {
     }
 };
 exports.cleanMessage = cleanMessage;
-const isRealMessage = (message) => {
+const isRealMessage = (message, meId) => {
+    var _a;
     const normalizedContent = (0, Utils_1.normalizeMessageContent)(message.message);
+    const hasSomeContent = !!(0, Utils_1.getContentType)(normalizedContent);
     return (!!normalizedContent
-        || MSG_MISSED_CALL_TYPES.has(message.messageStubType))
+        || REAL_MSG_STUB_TYPES.has(message.messageStubType)
+        || (REAL_MSG_REQ_ME_STUB_TYPES.has(message.messageStubType)
+            && ((_a = message.messageStubParameters) === null || _a === void 0 ? void 0 : _a.some(p => (0, WABinary_1.areJidsSameUser)(meId, p)))))
+        && hasSomeContent
         && !(normalizedContent === null || normalizedContent === void 0 ? void 0 : normalizedContent.protocolMessage)
         && !(normalizedContent === null || normalizedContent === void 0 ? void 0 : normalizedContent.reactionMessage);
 };
 exports.isRealMessage = isRealMessage;
 const shouldIncrementChatUnread = (message) => (!message.key.fromMe && !message.messageStubType);
 exports.shouldIncrementChatUnread = shouldIncrementChatUnread;
-const processMessage = async (message, { downloadHistory, ev, historyCache, recvChats, creds, keyStore, logger }) => {
-    var _a, _b, _c, _d;
+const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, keyStore, logger, options }) => {
+    var _a, _b, _c, _d, _e, _f, _g;
     const meId = creds.me.id;
     const { accountSettings } = creds;
     const chat = { id: (0, WABinary_1.jidNormalizedUser)(message.key.remoteJid) };
-    if ((0, exports.isRealMessage)(message)) {
+    const isRealMsg = (0, exports.isRealMessage)(message, meId);
+    if (isRealMsg) {
         chat.conversationTimestamp = (0, Utils_1.toNumber)(message.messageTimestamp);
         // only increment unread count if not CIPHERTEXT and from another person
         if ((0, exports.shouldIncrementChatUnread)(message)) {
             chat.unreadCount = (chat.unreadCount || 0) + 1;
         }
-        if (accountSettings === null || accountSettings === void 0 ? void 0 : accountSettings.unarchiveChats) {
-            chat.archive = false;
-            chat.readOnly = false;
-        }
     }
     const content = (0, Utils_1.normalizeMessageContent)(message.message);
+    // unarchive chat if it's a real message, or someone reacted to our message
+    // and we've the unarchive chats setting on
+    if ((isRealMsg || ((_b = (_a = content === null || content === void 0 ? void 0 : content.reactionMessage) === null || _a === void 0 ? void 0 : _a.key) === null || _b === void 0 ? void 0 : _b.fromMe))
+        && (accountSettings === null || accountSettings === void 0 ? void 0 : accountSettings.unarchiveChats)) {
+        chat.archived = false;
+        chat.readOnly = false;
+    }
     const protocolMsg = content === null || content === void 0 ? void 0 : content.protocolMessage;
     if (protocolMsg) {
         switch (protocolMsg.type) {
             case WAProto_1.proto.Message.ProtocolMessage.Type.HISTORY_SYNC_NOTIFICATION:
                 const histNotification = protocolMsg.historySyncNotification;
-                logger === null || logger === void 0 ? void 0 : logger.info({ histNotification, id: message.key.id }, 'got history notification');
-                if (downloadHistory) {
-                    const isLatest = historyCache.size === 0 && !((_a = creds.processedHistoryMessages) === null || _a === void 0 ? void 0 : _a.length);
-                    const { chats, contacts, messages, didProcess } = await (0, Utils_1.downloadAndProcessHistorySyncNotification)(histNotification, historyCache, recvChats);
-                    if (chats.length) {
-                        ev.emit('chats.set', { chats, isLatest });
-                    }
-                    if (messages.length) {
-                        ev.emit('messages.set', { messages, isLatest });
-                    }
-                    if (contacts.length) {
-                        ev.emit('contacts.set', { contacts, isLatest });
-                    }
-                    if (didProcess) {
-                        ev.emit('creds.update', {
-                            processedHistoryMessages: [
-                                ...(creds.processedHistoryMessages || []),
-                                { key: message.key, messageTimestamp: message.messageTimestamp }
-                            ]
-                        });
-                    }
+                const process = shouldProcessHistoryMsg;
+                const isLatest = !((_c = creds.processedHistoryMessages) === null || _c === void 0 ? void 0 : _c.length);
+                logger === null || logger === void 0 ? void 0 : logger.info({
+                    histNotification,
+                    process,
+                    id: message.key.id,
+                    isLatest,
+                }, 'got history notification');
+                if (process) {
+                    ev.emit('creds.update', {
+                        processedHistoryMessages: [
+                            ...(creds.processedHistoryMessages || []),
+                            { key: message.key, messageTimestamp: message.messageTimestamp }
+                        ]
+                    });
+                    const data = await (0, Utils_1.downloadAndProcessHistorySyncNotification)(histNotification, options);
+                    ev.emit('messaging-history.set', { ...data, isLatest });
                 }
                 break;
             case WAProto_1.proto.Message.ProtocolMessage.Type.APP_STATE_SYNC_KEY_SHARE:
@@ -98,12 +106,14 @@ const processMessage = async (message, { downloadHistory, ev, historyCache, recv
                 if (keys === null || keys === void 0 ? void 0 : keys.length) {
                     let newAppStateSyncKeyId = '';
                     await keyStore.transaction(async () => {
+                        const newKeys = [];
                         for (const { keyData, keyId } of keys) {
                             const strKeyId = Buffer.from(keyId.keyId).toString('base64');
-                            logger === null || logger === void 0 ? void 0 : logger.info({ strKeyId }, 'injecting new app state sync key');
+                            newKeys.push(strKeyId);
                             await keyStore.set({ 'app-state-sync-key': { [strKeyId]: keyData } });
                             newAppStateSyncKeyId = strKeyId;
                         }
+                        logger === null || logger === void 0 ? void 0 : logger.info({ newAppStateSyncKeyId, newKeys }, 'injecting new app state sync keys');
                     });
                     ev.emit('creds.update', { myAppStateKeyId: newAppStateSyncKeyId });
                 }
@@ -177,17 +187,21 @@ const processMessage = async (message, { downloadHistory, ev, historyCache, recv
                 emitParticipantsUpdate('promote');
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_ANNOUNCE:
-                const announceValue = (_b = message.messageStubParameters) === null || _b === void 0 ? void 0 : _b[0];
+                const announceValue = (_d = message.messageStubParameters) === null || _d === void 0 ? void 0 : _d[0];
                 emitGroupUpdate({ announce: announceValue === 'true' || announceValue === 'on' });
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_RESTRICT:
-                const restrictValue = (_c = message.messageStubParameters) === null || _c === void 0 ? void 0 : _c[0];
+                const restrictValue = (_e = message.messageStubParameters) === null || _e === void 0 ? void 0 : _e[0];
                 emitGroupUpdate({ restrict: restrictValue === 'true' || restrictValue === 'on' });
                 break;
             case Types_1.WAMessageStubType.GROUP_CHANGE_SUBJECT:
-                const name = (_d = message.messageStubParameters) === null || _d === void 0 ? void 0 : _d[0];
+                const name = (_f = message.messageStubParameters) === null || _f === void 0 ? void 0 : _f[0];
                 chat.name = name;
                 emitGroupUpdate({ subject: name });
+                break;
+            case Types_1.WAMessageStubType.GROUP_CHANGE_INVITE_LINK:
+                const code = (_g = message.messageStubParameters) === null || _g === void 0 ? void 0 : _g[0];
+                emitGroupUpdate({ inviteCode: code });
                 break;
         }
     }

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.configureSuccessfulPairing = exports.generateRegistrationNode = exports.generateLoginNode = void 0;
+exports.encodeSignedDeviceIdentity = exports.configureSuccessfulPairing = exports.generateRegistrationNode = exports.generateLoginNode = void 0;
 const boom_1 = require("@hapi/boom");
 const crypto_1 = require("crypto");
 const WAProto_1 = require("../../WAProto");
@@ -124,13 +124,7 @@ const configureSuccessfulPairing = (stanza, { advSecretKey, signedIdentityKey, s
     const deviceMsg = Buffer.concat([Buffer.from([6, 1]), deviceDetails, signedIdentityKey.public, accountSignatureKey]);
     account.deviceSignature = crypto_2.Curve.sign(signedIdentityKey.private, deviceMsg);
     const identity = (0, signal_1.createSignalIdentity)(jid, accountSignatureKey);
-    const accountEnc = WAProto_1.proto.ADVSignedDeviceIdentity
-        .encode({
-        ...account,
-        // do not provide the "accountSignatureKey" back
-        accountSignatureKey: undefined
-    })
-        .finish();
+    const accountEnc = (0, exports.encodeSignedDeviceIdentity)(account, false);
     const deviceIdentity = WAProto_1.proto.ADVDeviceIdentity.decode(account.details);
     const reply = {
         tag: 'iq',
@@ -168,3 +162,17 @@ const configureSuccessfulPairing = (stanza, { advSecretKey, signedIdentityKey, s
     };
 };
 exports.configureSuccessfulPairing = configureSuccessfulPairing;
+const encodeSignedDeviceIdentity = (account, includeSignatureKey) => {
+    var _a;
+    account = { ...account };
+    // set to null if we are not to include the signature key
+    // or if we are including the signature key but it is empty
+    if (!includeSignatureKey || !((_a = account.accountSignatureKey) === null || _a === void 0 ? void 0 : _a.length)) {
+        account.accountSignatureKey = null;
+    }
+    const accountEnc = WAProto_1.proto.ADVSignedDeviceIdentity
+        .encode(account)
+        .finish();
+    return accountEnc;
+};
+exports.encodeSignedDeviceIdentity = encodeSignedDeviceIdentity;

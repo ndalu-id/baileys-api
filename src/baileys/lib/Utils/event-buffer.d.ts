@@ -1,5 +1,5 @@
 import { Logger } from 'pino';
-import { AuthenticationCreds, BaileysEventEmitter, BaileysEventMap } from '../Types';
+import { BaileysEventEmitter, BaileysEventMap } from '../Types';
 /**
  * A map that contains a list of all events that have been triggered
  *
@@ -7,19 +7,24 @@ import { AuthenticationCreds, BaileysEventEmitter, BaileysEventMap } from '../Ty
  * this can make processing events extremely efficient -- since everything
  * can be done in a single transaction
  */
-declare type BaileysEventData = Partial<BaileysEventMap<AuthenticationCreds>>;
+declare type BaileysEventData = Partial<BaileysEventMap>;
 declare type BaileysBufferableEventEmitter = BaileysEventEmitter & {
     /** Use to process events in a batch */
     process(handler: (events: BaileysEventData) => void | Promise<void>): (() => void);
     /**
      * starts buffering events, call flush() to release them
-     * @returns true if buffering just started, false if it was already buffering
      * */
-    buffer(): boolean;
-    /** flushes all buffered events */
-    flush(): Promise<void>;
-    /** waits for the task to complete, before releasing the buffer */
-    processInBuffer(task: Promise<any>): any;
+    buffer(): void;
+    /** buffers all events till the promise completes */
+    createBufferedFunction<A extends any[], T>(work: (...args: A) => Promise<T>): ((...args: A) => Promise<T>);
+    /**
+     * flushes all buffered events
+     * @param force if true, will flush all data regardless of any pending buffers
+     * @returns returns true if the flush actually happened, otherwise false
+     */
+    flush(force?: boolean): boolean;
+    /** is there an ongoing buffer */
+    isBuffering(): boolean;
 };
 /**
  * The event buffer logically consolidates different events into a single event

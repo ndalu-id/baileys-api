@@ -30,6 +30,9 @@
             <li>
                 <a href="/docs">docs</a>
             </li>
+            <li>
+                <a href="/chats?token=test">chats default token</a>
+            </li>
         </ul>
     </nav>
     
@@ -93,8 +96,11 @@
             e.preventDefault()
             document.querySelector('#form-send').setAttribute('style', 'block')
             const token = document.querySelector('input[name="token"]')
-            if ( !token.value ) return
-            const res = await startConnection(token)
+            const session = document.querySelector('#token')
+            if ( !token?.value || token.value.trim() == session?.value?.trim() ) return
+            session.value = token.value
+            const res = await startConnection(session.value)
+            console.log(res)
             if (res.qrcode) { // if result has qrcode
                 qrcode.src = res.qrcode // set element image src to res.qrcode
             }

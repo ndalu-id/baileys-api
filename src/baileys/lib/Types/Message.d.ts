@@ -6,6 +6,7 @@ import type { Logger } from 'pino';
 import type { Readable } from 'stream';
 import type { URL } from 'url';
 import { proto } from '../../WAProto';
+import { MEDIA_HKDF_KEY_MAPPING } from '../Defaults';
 import type { GroupMetadata } from './GroupMetadata';
 export { proto as WAProto };
 export declare type WAMessage = proto.IWebMessageInfo;
@@ -47,6 +48,8 @@ export interface WAUrlInfo {
     title: string;
     description?: string;
     jpegThumbnail?: Buffer;
+    highQualityThumbnail?: proto.Message.IImageMessage;
+    originalThumbnailUrl?: string;
 }
 declare type Mentionable = {
     /** list of jids that are mentioned in the accompanying text */
@@ -76,7 +79,7 @@ declare type WithDimensions = {
     width?: number;
     height?: number;
 };
-export declare type MediaType = 'image' | 'video' | 'sticker' | 'audio' | 'document' | 'history' | 'md-app-state';
+export declare type MediaType = keyof typeof MEDIA_HKDF_KEY_MAPPING;
 export declare type AnyMediaMessageContent = (({
     image: WAMediaUpload;
     caption?: string;
@@ -99,6 +102,7 @@ export declare type AnyMediaMessageContent = (({
     document: WAMediaUpload;
     mimetype: string;
     fileName?: string;
+    caption?: string;
 } & Buttonable & Templatable)) & {
     mimetype?: string;
 };
@@ -106,6 +110,9 @@ export declare type ButtonReplyInfo = {
     displayText: string;
     id: string;
     index: number;
+};
+export declare type WASendableProduct = Omit<proto.Message.ProductMessage.IProductSnapshot, 'productImage'> & {
+    productImage: WAMediaUpload;
 };
 export declare type AnyRegularMessageContent = (({
     text: string;
@@ -122,6 +129,13 @@ export declare type AnyRegularMessageContent = (({
 } | {
     buttonReply: ButtonReplyInfo;
     type: 'template' | 'plain';
+} | {
+    listReply: Omit<proto.Message.IListResponseMessage, 'contextInfo'>;
+} | {
+    product: WASendableProduct;
+    businessOwnerJid?: string;
+    body?: string;
+    footer?: string;
 }) & ViewOnce;
 export declare type AnyMessageContent = AnyRegularMessageContent | {
     forward: WAMessage;
@@ -175,6 +189,7 @@ export declare type WAMediaUploadFunction = (readStream: Readable, opts: {
 }>;
 export declare type MediaGenerationOptions = {
     logger?: Logger;
+    mediaTypeOverride?: MediaType;
     upload: WAMediaUploadFunction;
     /** cache media so it does not have to be uploaded again */
     mediaCache?: NodeCache;

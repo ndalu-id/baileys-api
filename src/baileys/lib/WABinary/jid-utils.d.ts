@@ -17,11 +17,11 @@ export declare const jidDecode: (jid: string | undefined) => FullJid | undefined
 /** is the jid a user */
 export declare const areJidsSameUser: (jid1: string | undefined, jid2: string | undefined) => boolean;
 /** is the jid a user */
-export declare const isJidUser: (jid: string) => boolean;
+export declare const isJidUser: (jid: string | undefined) => boolean | undefined;
 /** is the jid a broadcast */
-export declare const isJidBroadcast: (jid: string) => boolean;
+export declare const isJidBroadcast: (jid: string | undefined) => boolean | undefined;
 /** is the jid a group */
-export declare const isJidGroup: (jid: string) => boolean;
+export declare const isJidGroup: (jid: string | undefined) => boolean | undefined;
 /** is the jid the status broadcast */
 export declare const isJidStatusBroadcast: (jid: string) => boolean;
-export declare const jidNormalizedUser: (jid: string) => string;
+export declare const jidNormalizedUser: (jid: string | undefined) => string;

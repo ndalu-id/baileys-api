@@ -1,16 +1,15 @@
+import { AxiosRequestConfig } from 'axios';
 import { proto } from '../../WAProto';
-import { Chat, Contact, InitialReceivedChatsState } from '../Types';
-export declare const downloadHistory: (msg: proto.Message.IHistorySyncNotification) => Promise<proto.HistorySync>;
-export declare const processHistoryMessage: (item: proto.IHistorySync, historyCache: Set<string>, recvChats: InitialReceivedChatsState) => {
+import { Chat, Contact } from '../Types';
+export declare const downloadHistory: (msg: proto.Message.IHistorySyncNotification, options: AxiosRequestConfig<any>) => Promise<proto.HistorySync>;
+export declare const processHistoryMessage: (item: proto.IHistorySync) => {
     chats: Chat[];
     contacts: Contact[];
     messages: proto.IWebMessageInfo[];
-    didProcess: boolean;
 };
-export declare const downloadAndProcessHistorySyncNotification: (msg: proto.Message.IHistorySyncNotification, historyCache: Set<string>, recvChats: InitialReceivedChatsState) => Promise<{
+export declare const downloadAndProcessHistorySyncNotification: (msg: proto.Message.IHistorySyncNotification, options: AxiosRequestConfig<any>) => Promise<{
     chats: Chat[];
     contacts: Contact[];
     messages: proto.IWebMessageInfo[];
-    didProcess: boolean;
 }>;
-export declare const isHistoryMsg: (message: proto.IMessage) => boolean;
+export declare const getHistoryMsg: (message: proto.IMessage) => proto.Message.IHistorySyncNotification | null | undefined;

@@ -1,5 +1,6 @@
 /// <reference types="node" />
-import type { LegacySocketConfig, MediaType, SocketConfig } from '../Types';
+import { proto } from '../../WAProto';
+import type { MediaType, SocketConfig } from '../Types';
 export declare const UNAUTHORIZED_CODES: number[];
 export declare const DEFAULT_ORIGIN = "https://web.whatsapp.com";
 export declare const DEF_CALLBACK_PREFIX = "CB:";
@@ -16,11 +17,30 @@ export declare const URL_EXCLUDE_REGEX: RegExp;
 export declare const WA_CERT_DETAILS: {
     SERIAL: number;
 };
+export declare const PROCESSABLE_HISTORY_TYPES: proto.Message.HistorySyncNotification.HistorySyncType[];
 export declare const DEFAULT_CONNECTION_CONFIG: SocketConfig;
-export declare const DEFAULT_LEGACY_CONNECTION_CONFIG: LegacySocketConfig;
 export declare const MEDIA_PATH_MAP: {
-    [T in MediaType]: string;
+    [T in MediaType]?: string;
 };
-export declare const MEDIA_KEYS: MediaType[];
+export declare const MEDIA_HKDF_KEY_MAPPING: {
+    audio: string;
+    document: string;
+    gif: string;
+    image: string;
+    ppic: string;
+    product: string;
+    ptt: string;
+    sticker: string;
+    video: string;
+    'thumbnail-document': string;
+    'thumbnail-image': string;
+    'thumbnail-video': string;
+    'thumbnail-link': string;
+    'md-msg-hist': string;
+    'md-app-state': string;
+    'product-catalog-image': string;
+    'payment-bg-image': string;
+};
+export declare const MEDIA_KEYS: ("audio" | "document" | "gif" | "image" | "ppic" | "product" | "ptt" | "sticker" | "video" | "thumbnail-document" | "thumbnail-image" | "thumbnail-video" | "thumbnail-link" | "md-msg-hist" | "md-app-state" | "product-catalog-image" | "payment-bg-image")[];
 export declare const MIN_PREKEY_COUNT = 5;
 export declare const INITIAL_PREKEY_COUNT = 30;

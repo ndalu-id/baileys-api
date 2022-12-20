@@ -11,32 +11,53 @@ const WABinary_1 = require("../WABinary");
 const groups_1 = require("./groups");
 const messages_send_1 = require("./messages-send");
 const makeMessagesRecvSocket = (config) => {
-    const { logger, retryRequestDelayMs, getMessage } = config;
+    const { logger, retryRequestDelayMs, getMessage, shouldIgnoreJid } = config;
     const sock = (0, messages_send_1.makeMessagesSocket)(config);
-    const { ev, authState, ws, processingMutex, upsertMessage, resyncAppState, onUnexpectedError, assertSessions, sendNode, relayMessage, sendReceipt, uploadPreKeys, } = sock;
+    const { ev, authState, ws, query, processingMutex, upsertMessage, resyncAppState, onUnexpectedError, assertSessions, sendNode, relayMessage, sendReceipt, uploadPreKeys, } = sock;
     /** this mutex ensures that each retryRequest will wait for the previous one to finish */
     const retryMutex = (0, make_mutex_1.makeMutex)();
     const msgRetryMap = config.msgRetryCounterMap || {};
     const callOfferData = {};
     let sendActiveReceipts = false;
-    const sendMessageAck = async ({ tag, attrs }, extraAttrs = {}) => {
+    const sendMessageAck = async ({ tag, attrs }) => {
         const stanza = {
             tag: 'ack',
             attrs: {
                 id: attrs.id,
                 to: attrs.from,
                 class: tag,
-                ...extraAttrs,
             }
         };
         if (!!attrs.participant) {
             stanza.attrs.participant = attrs.participant;
         }
-        if (tag !== 'message' && attrs.type && !extraAttrs.type) {
+        if (!!attrs.recipient) {
+            stanza.attrs.recipient = attrs.recipient;
+        }
+        if (tag !== 'message' && attrs.type) {
             stanza.attrs.type = attrs.type;
         }
         logger.debug({ recv: { tag, attrs }, sent: stanza.attrs }, 'sent ack');
         await sendNode(stanza);
+    };
+    const rejectCall = async (callId, callFrom) => {
+        const stanza = ({
+            tag: 'call',
+            attrs: {
+                from: authState.creds.me.id,
+                to: callFrom,
+            },
+            content: [{
+                    tag: 'reject',
+                    attrs: {
+                        'call-id': callId,
+                        'call-creator': callFrom,
+                        count: '0',
+                    },
+                    content: undefined,
+                }],
+        });
+        await query(stanza);
     };
     const sendRetryRequest = async (node, forceIncludeKeys = false) => {
         const msgId = node.attrs.id;
@@ -49,10 +70,7 @@ const makeMessagesRecvSocket = (config) => {
         retryCount += 1;
         msgRetryMap[msgId] = retryCount;
         const { account, signedPreKey, signedIdentityKey: identityKey } = authState.creds;
-        const deviceIdentity = WAProto_1.proto.ADVSignedDeviceIdentity.encode({
-            ...account,
-            accountSignatureKey: undefined
-        }).finish();
+        const deviceIdentity = (0, Utils_1.encodeSignedDeviceIdentity)(account, true);
         await authState.keys.transaction(async () => {
             const receipt = {
                 tag: 'receipt',
@@ -129,86 +147,145 @@ const makeMessagesRecvSocket = (config) => {
             }
         }
     };
+    const handleGroupNotification = (participant, child, msg) => {
+        switch (child === null || child === void 0 ? void 0 : child.tag) {
+            case 'create':
+                const metadata = (0, groups_1.extractGroupMetadata)(child);
+                msg.messageStubType = Types_1.WAMessageStubType.GROUP_CREATE;
+                msg.messageStubParameters = [metadata.subject];
+                msg.key = { participant: metadata.owner };
+                ev.emit('chats.upsert', [{
+                        id: metadata.id,
+                        name: metadata.subject,
+                        conversationTimestamp: metadata.creation,
+                    }]);
+                ev.emit('groups.upsert', [metadata]);
+                break;
+            case 'ephemeral':
+            case 'not_ephemeral':
+                msg.message = {
+                    protocolMessage: {
+                        type: WAProto_1.proto.Message.ProtocolMessage.Type.EPHEMERAL_SETTING,
+                        ephemeralExpiration: +(child.attrs.expiration || 0)
+                    }
+                };
+                break;
+            case 'promote':
+            case 'demote':
+            case 'remove':
+            case 'add':
+            case 'leave':
+                const stubType = `GROUP_PARTICIPANT_${child.tag.toUpperCase()}`;
+                msg.messageStubType = Types_1.WAMessageStubType[stubType];
+                const participants = (0, WABinary_1.getBinaryNodeChildren)(child, 'participant').map(p => p.attrs.jid);
+                if (participants.length === 1 &&
+                    // if recv. "remove" message and sender removed themselves
+                    // mark as left
+                    (0, WABinary_1.areJidsSameUser)(participants[0], participant) &&
+                    child.tag === 'remove') {
+                    msg.messageStubType = Types_1.WAMessageStubType.GROUP_PARTICIPANT_LEAVE;
+                }
+                msg.messageStubParameters = participants;
+                break;
+            case 'subject':
+                msg.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_SUBJECT;
+                msg.messageStubParameters = [child.attrs.subject];
+                break;
+            case 'announcement':
+            case 'not_announcement':
+                msg.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_ANNOUNCE;
+                msg.messageStubParameters = [(child.tag === 'announcement') ? 'on' : 'off'];
+                break;
+            case 'locked':
+            case 'unlocked':
+                msg.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_RESTRICT;
+                msg.messageStubParameters = [(child.tag === 'locked') ? 'on' : 'off'];
+                break;
+            case 'invite':
+                msg.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_INVITE_LINK;
+                msg.messageStubParameters = [child.attrs.code];
+                break;
+        }
+    };
     const processNotification = async (node) => {
         const result = {};
         const [child] = (0, WABinary_1.getAllBinaryNodeChildren)(node);
         const nodeType = node.attrs.type;
-        if (nodeType === 'w:gp2') {
-            switch (child === null || child === void 0 ? void 0 : child.tag) {
-                case 'create':
-                    const metadata = (0, groups_1.extractGroupMetadata)(child);
-                    result.messageStubType = Types_1.WAMessageStubType.GROUP_CREATE;
-                    result.messageStubParameters = [metadata.subject];
-                    result.key = { participant: metadata.owner };
-                    ev.emit('chats.upsert', [{
-                            id: metadata.id,
-                            name: metadata.subject,
-                            conversationTimestamp: metadata.creation,
-                        }]);
-                    ev.emit('groups.upsert', [metadata]);
-                    break;
-                case 'ephemeral':
-                case 'not_ephemeral':
-                    result.message = {
-                        protocolMessage: {
-                            type: WAProto_1.proto.Message.ProtocolMessage.Type.EPHEMERAL_SETTING,
-                            ephemeralExpiration: +(child.attrs.expiration || 0)
+        const from = (0, WABinary_1.jidNormalizedUser)(node.attrs.from);
+        switch (nodeType) {
+            case 'privacy_token':
+                const tokenList = (0, WABinary_1.getBinaryNodeChildren)(child, 'token');
+                for (const { attrs, content } of tokenList) {
+                    const jid = attrs.jid;
+                    ev.emit('chats.update', [
+                        {
+                            id: jid,
+                            tcToken: content
                         }
-                    };
-                    break;
-                case 'promote':
-                case 'demote':
-                case 'remove':
-                case 'add':
-                case 'leave':
-                    const stubType = `GROUP_PARTICIPANT_${child.tag.toUpperCase()}`;
-                    result.messageStubType = Types_1.WAMessageStubType[stubType];
-                    const participants = (0, WABinary_1.getBinaryNodeChildren)(child, 'participant').map(p => p.attrs.jid);
-                    if (participants.length === 1 &&
-                        // if recv. "remove" message and sender removed themselves
-                        // mark as left
-                        (0, WABinary_1.areJidsSameUser)(participants[0], node.attrs.participant) &&
-                        child.tag === 'remove') {
-                        result.messageStubType = Types_1.WAMessageStubType.GROUP_PARTICIPANT_LEAVE;
+                    ]);
+                    logger.debug({ jid }, 'got privacy token update');
+                }
+                break;
+            case 'w:gp2':
+                handleGroupNotification(node.attrs.participant, child, result);
+                break;
+            case 'mediaretry':
+                const event = (0, Utils_1.decodeMediaRetryNode)(node);
+                ev.emit('messages.media-update', [event]);
+                break;
+            case 'encrypt':
+                await handleEncryptNotification(node);
+                break;
+            case 'devices':
+                const devices = (0, WABinary_1.getBinaryNodeChildren)(child, 'device');
+                if ((0, WABinary_1.areJidsSameUser)(child.attrs.jid, authState.creds.me.id)) {
+                    const deviceJids = devices.map(d => d.attrs.jid);
+                    logger.info({ deviceJids }, 'got my own devices');
+                }
+                break;
+            case 'server_sync':
+                const update = (0, WABinary_1.getBinaryNodeChild)(node, 'collection');
+                if (update) {
+                    const name = update.attrs.name;
+                    await resyncAppState([name], false);
+                }
+                break;
+            case 'picture':
+                const setPicture = (0, WABinary_1.getBinaryNodeChild)(node, 'set');
+                const delPicture = (0, WABinary_1.getBinaryNodeChild)(node, 'delete');
+                ev.emit('contacts.update', [{
+                        id: from,
+                        imgUrl: setPicture ? 'changed' : null
+                    }]);
+                if ((0, WABinary_1.isJidGroup)(from)) {
+                    const node = setPicture || delPicture;
+                    result.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_ICON;
+                    if (setPicture) {
+                        result.messageStubParameters = [setPicture.attrs.id];
                     }
-                    result.messageStubParameters = participants;
-                    break;
-                case 'subject':
-                    result.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_SUBJECT;
-                    result.messageStubParameters = [child.attrs.subject];
-                    break;
-                case 'announcement':
-                case 'not_announcement':
-                    result.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_ANNOUNCE;
-                    result.messageStubParameters = [(child.tag === 'announcement') ? 'on' : 'off'];
-                    break;
-                case 'locked':
-                case 'unlocked':
-                    result.messageStubType = Types_1.WAMessageStubType.GROUP_CHANGE_RESTRICT;
-                    result.messageStubParameters = [(child.tag === 'locked') ? 'on' : 'off'];
-                    break;
-            }
-        }
-        else if (nodeType === 'mediaretry') {
-            const event = (0, Utils_1.decodeMediaRetryNode)(node);
-            ev.emit('messages.media-update', [event]);
-        }
-        else if (nodeType === 'encrypt') {
-            await handleEncryptNotification(node);
-        }
-        else if (nodeType === 'devices') {
-            const devices = (0, WABinary_1.getBinaryNodeChildren)(child, 'device');
-            if ((0, WABinary_1.areJidsSameUser)(child.attrs.jid, authState.creds.me.id)) {
-                const deviceJids = devices.map(d => d.attrs.jid);
-                logger.info({ deviceJids }, 'got my own devices');
-            }
-        }
-        else if (nodeType === 'server_sync') {
-            const update = (0, WABinary_1.getBinaryNodeChild)(node, 'collection');
-            if (update) {
-                const name = update.attrs.name;
-                await resyncAppState([name], undefined);
-            }
+                    result.participant = node === null || node === void 0 ? void 0 : node.attrs.author;
+                    result.key = {
+                        ...result.key || {},
+                        participant: setPicture === null || setPicture === void 0 ? void 0 : setPicture.attrs.author
+                    };
+                }
+                break;
+            case 'account_sync':
+                if (child.tag === 'disappearing_mode') {
+                    const newDuration = +child.attrs.duration;
+                    const timestamp = +child.attrs.t;
+                    logger.info({ newDuration }, 'updated account disappearing mode');
+                    ev.emit('creds.update', {
+                        accountSettings: {
+                            ...authState.creds.accountSettings,
+                            defaultDisappearingMode: {
+                                ephemeralExpiration: newDuration,
+                                ephemeralSettingTimestamp: timestamp,
+                            },
+                        }
+                    });
+                }
+                break;
         }
         if (Object.keys(result).length) {
             return result;
@@ -264,17 +341,22 @@ const makeMessagesRecvSocket = (config) => {
         const isNodeFromMe = (0, WABinary_1.areJidsSameUser)(attrs.participant || attrs.from, (_a = authState.creds.me) === null || _a === void 0 ? void 0 : _a.id);
         const remoteJid = !isNodeFromMe || (0, WABinary_1.isJidGroup)(attrs.from) ? attrs.from : attrs.recipient;
         const fromMe = !attrs.recipient || (attrs.type === 'retry' && isNodeFromMe);
-        const ids = [attrs.id];
-        if (Array.isArray(content)) {
-            const items = (0, WABinary_1.getBinaryNodeChildren)(content[0], 'item');
-            ids.push(...items.map(i => i.attrs.id));
-        }
         const key = {
             remoteJid,
             id: '',
             fromMe,
             participant: attrs.participant
         };
+        if (shouldIgnoreJid(remoteJid)) {
+            logger.debug({ remoteJid }, 'ignoring receipt from jid');
+            await sendMessageAck(node);
+            return;
+        }
+        const ids = [attrs.id];
+        if (Array.isArray(content)) {
+            const items = (0, WABinary_1.getBinaryNodeChildren)(content[0], 'item');
+            ids.push(...items.map(i => i.attrs.id));
+        }
         await Promise.all([
             processingMutex.mutex(async () => {
                 const status = (0, Utils_1.getStatusFromReceiptType)(attrs.type);
@@ -331,8 +413,14 @@ const makeMessagesRecvSocket = (config) => {
     };
     const handleNotification = async (node) => {
         const remoteJid = node.attrs.from;
+        if (shouldIgnoreJid(remoteJid)) {
+            logger.debug({ remoteJid, id: node.attrs.id }, 'ignored notification');
+            await sendMessageAck(node);
+            return;
+        }
         await Promise.all([
             processingMutex.mutex(async () => {
+                var _a;
                 const msg = await processNotification(node);
                 if (msg) {
                     const fromMe = (0, WABinary_1.areJidsSameUser)(node.attrs.participant || remoteJid, authState.creds.me.id);
@@ -343,7 +431,7 @@ const makeMessagesRecvSocket = (config) => {
                         id: node.attrs.id,
                         ...(msg.key || {})
                     };
-                    msg.participant = node.attrs.participant;
+                    (_a = msg.participant) !== null && _a !== void 0 ? _a : (msg.participant = node.attrs.participant);
                     msg.messageTimestamp = +node.attrs.t;
                     const fullMsg = WAProto_1.proto.WebMessageInfo.fromObject(msg);
                     await upsertMessage(fullMsg, 'append');
@@ -353,10 +441,15 @@ const makeMessagesRecvSocket = (config) => {
         ]);
     };
     const handleMessage = async (node) => {
-        const { fullMessage: msg, category, author, decryptionTask } = (0, Utils_1.decodeMessageStanza)(node, authState);
+        const { fullMessage: msg, category, author, decrypt } = (0, Utils_1.decodeMessageStanza)(node, authState);
+        if (shouldIgnoreJid(msg.key.remoteJid)) {
+            logger.debug({ key: msg.key }, 'ignored message');
+            await sendMessageAck(node);
+            return;
+        }
         await Promise.all([
             processingMutex.mutex(async () => {
-                await decryptionTask;
+                await decrypt();
                 // message failed to decrypt
                 if (msg.messageStubType === WAProto_1.proto.WebMessageInfo.StubType.CIPHERTEXT) {
                     logger.error({ key: msg.key, params: msg.messageStubParameters }, 'failure in decrypting message');
@@ -392,7 +485,7 @@ const makeMessagesRecvSocket = (config) => {
                     }
                     await sendReceipt(msg.key.remoteJid, participant, [msg.key.id], type);
                     // send ack for history message
-                    const isAnyHistoryMsg = (0, Utils_1.isHistoryMsg)(msg.message);
+                    const isAnyHistoryMsg = (0, Utils_1.getHistoryMsg)(msg.message);
                     if (isAnyHistoryMsg) {
                         const jid = (0, WABinary_1.jidNormalizedUser)(msg.key.remoteJid);
                         await sendReceipt(jid, undefined, [msg.key.id], 'hist_sync');
@@ -433,7 +526,7 @@ const makeMessagesRecvSocket = (config) => {
             delete callOfferData[call.id];
         }
         ev.emit('call', [call]);
-        await sendMessageAck(node, { type: infoChild.tag });
+        await sendMessageAck(node);
     };
     const handleBadAck = async ({ attrs }) => {
         // current hypothesis is that if pash is sent in the ack
@@ -451,34 +544,29 @@ const makeMessagesRecvSocket = (config) => {
             }
         }
     };
-    const flushBufferIfLastOfflineNode = (node, identifier, exec) => {
-        const task = exec(node)
-            .catch(err => onUnexpectedError(err, identifier));
-        const offline = node.attrs.offline;
-        if (offline) {
-            ev.processInBuffer(task);
+    /// processes a node with the given function
+    /// and adds the task to the existing buffer if we're buffering events
+    const processNodeWithBuffer = async (node, identifier, exec) => {
+        ev.buffer();
+        await execTask();
+        ev.flush();
+        function execTask() {
+            return exec(node)
+                .catch(err => onUnexpectedError(err, identifier));
         }
     };
-    // called when all offline notifs are handled
-    ws.on('CB:ib,,offline', async (node) => {
-        const child = (0, WABinary_1.getBinaryNodeChild)(node, 'offline');
-        const offlineNotifs = +((child === null || child === void 0 ? void 0 : child.attrs.count) || 0);
-        logger.info(`handled ${offlineNotifs} offline messages/notifications`);
-        await ev.flush();
-        ev.emit('connection.update', { receivedPendingNotifications: true });
-    });
     // recv a message
     ws.on('CB:message', (node) => {
-        flushBufferIfLastOfflineNode(node, 'processing message', handleMessage);
+        processNodeWithBuffer(node, 'processing message', handleMessage);
     });
     ws.on('CB:call', async (node) => {
-        flushBufferIfLastOfflineNode(node, 'handling call', handleCall);
+        processNodeWithBuffer(node, 'handling call', handleCall);
     });
     ws.on('CB:receipt', node => {
-        flushBufferIfLastOfflineNode(node, 'handling receipt', handleReceipt);
+        processNodeWithBuffer(node, 'handling receipt', handleReceipt);
     });
     ws.on('CB:notification', async (node) => {
-        flushBufferIfLastOfflineNode(node, 'handling notification', handleNotification);
+        processNodeWithBuffer(node, 'handling notification', handleNotification);
     });
     ws.on('CB:ack,class:message', (node) => {
         handleBadAck(node)
@@ -519,7 +607,8 @@ const makeMessagesRecvSocket = (config) => {
     return {
         ...sock,
         sendMessageAck,
-        sendRetryRequest
+        sendRetryRequest,
+        rejectCall
     };
 };
 exports.makeMessagesRecvSocket = makeMessagesRecvSocket;

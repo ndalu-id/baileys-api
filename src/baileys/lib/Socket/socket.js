@@ -19,9 +19,10 @@ const WABinary_1 = require("../WABinary");
  * - listen to messages and emit events
  * - query phone connection
  */
-const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout }) => {
+const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout, options, }) => {
     const ws = new ws_1.default(waWebSocketUrl, undefined, {
         origin: Defaults_1.DEFAULT_ORIGIN,
+        headers: options.headers,
         handshakeTimeout: connectTimeoutMs,
         timeout: connectTimeoutMs,
         agent
@@ -320,7 +321,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
         ]
     }));
     /** logout & invalidate connection */
-    const logout = async () => {
+    const logout = async (msg) => {
         var _a;
         const jid = (_a = authState.creds.me) === null || _a === void 0 ? void 0 : _a.id;
         if (jid) {
@@ -343,10 +344,18 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
                 ]
             });
         }
-        end(new boom_1.Boom('Intentional Logout', { statusCode: Types_1.DisconnectReason.loggedOut }));
+        end(new boom_1.Boom(msg || 'Intentional Logout', { statusCode: Types_1.DisconnectReason.loggedOut }));
     };
     ws.on('message', onMessageRecieved);
-    ws.on('open', validateConnection);
+    ws.on('open', async () => {
+        try {
+            await validateConnection();
+        }
+        catch (err) {
+            logger.error({ err }, 'error in validating connection');
+            end(err);
+        }
+    });
     ws.on('error', error => end(new boom_1.Boom(`WebSocket Error (${error.message})`, { statusCode: (0, Utils_1.getCodeFromWSError)(error), data: error })));
     ws.on('close', () => end(new boom_1.Boom('Connection Terminated', { statusCode: Types_1.DisconnectReason.connectionClosed })));
     // the server terminated the connection
@@ -422,10 +431,27 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
     ws.on('CB:ib,,downgrade_webclient', () => {
         end(new boom_1.Boom('Multi-device beta not joined', { statusCode: Types_1.DisconnectReason.multideviceMismatch }));
     });
+    let didStartBuffer = false;
     process.nextTick(() => {
-        // start buffering important events
-        ev.buffer();
+        var _a;
+        if ((_a = creds.me) === null || _a === void 0 ? void 0 : _a.id) {
+            // start buffering important events
+            // if we're logged in
+            ev.buffer();
+            didStartBuffer = true;
+        }
         ev.emit('connection.update', { connection: 'connecting', receivedPendingNotifications: false, qr: undefined });
+    });
+    // called when all offline notifs are handled
+    ws.on('CB:ib,,offline', (node) => {
+        const child = (0, WABinary_1.getBinaryNodeChild)(node, 'offline');
+        const offlineNotifs = +((child === null || child === void 0 ? void 0 : child.attrs.count) || 0);
+        logger.info(`handled ${offlineNotifs} offline messages/notifications`);
+        if (didStartBuffer) {
+            ev.flush();
+            logger.trace('flushed events for initial buffer');
+        }
+        ev.emit('connection.update', { receivedPendingNotifications: true });
     });
     // update credentials when required
     ev.on('creds.update', update => {
@@ -433,7 +459,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
         const name = (_a = update.me) === null || _a === void 0 ? void 0 : _a.name;
         // if name has just been received
         if (((_b = creds.me) === null || _b === void 0 ? void 0 : _b.name) !== name) {
-            logger.info({ name }, 'updated pushName');
+            logger.debug({ name }, 'updated pushName');
             sendNode({
                 tag: 'presence',
                 attrs: { name: name }
@@ -465,6 +491,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
         end,
         onUnexpectedError,
         uploadPreKeys,
+        uploadPreKeysToServerIfRequired,
         /** Waits for the connection to WA to reach a state */
         waitForConnectionUpdate: (0, Utils_1.bindWaitForConnectionUpdate)(ev),
     };

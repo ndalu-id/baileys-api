@@ -25,6 +25,7 @@ export interface GroupMetadata {
     size?: number;
     participants: GroupParticipant[];
     ephemeralDuration?: number;
+    inviteCode?: string;
 }
 export interface WAGroupCreateResponse {
     status: number;

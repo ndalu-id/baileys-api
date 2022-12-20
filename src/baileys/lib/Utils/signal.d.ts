@@ -26,7 +26,7 @@ export declare const signalStorage: ({ creds, keys }: SignalAuthState) => {
         pubKey: Buffer;
     } | undefined>;
     removePreKey: (id: number) => void | Promise<void>;
-    loadSignedPreKey: (keyId: number) => {
+    loadSignedPreKey: () => {
         privKey: Buffer;
         pubKey: Buffer;
     };

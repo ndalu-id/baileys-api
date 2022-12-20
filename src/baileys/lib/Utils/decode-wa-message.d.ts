@@ -5,5 +5,5 @@ export declare const decodeMessageStanza: (stanza: BinaryNode, auth: Authenticat
     fullMessage: proto.IWebMessageInfo;
     category: string;
     author: string;
-    decryptionTask: Promise<void>;
+    decrypt(): Promise<void>;
 };

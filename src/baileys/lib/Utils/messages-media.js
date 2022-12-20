@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStatusCodeForMediaRetry = exports.decryptMediaRetryData = exports.decodeMediaRetryNode = exports.encryptMediaRetryRequest = exports.getWAUploadToServer = exports.extensionForMediaMessage = exports.downloadEncryptedContent = exports.downloadContentFromMessage = exports.getUrlFromDirectPath = exports.encryptedStream = exports.getHttpStream = exports.generateThumbnail = exports.getStream = exports.toBuffer = exports.toReadable = exports.getAudioDuration = exports.mediaMessageSHA256B64 = exports.generateProfilePicture = exports.extractImageThumb = exports.getMediaKeys = exports.hkdfInfoKey = void 0;
+exports.getStatusCodeForMediaRetry = exports.decryptMediaRetryData = exports.decodeMediaRetryNode = exports.encryptMediaRetryRequest = exports.getWAUploadToServer = exports.extensionForMediaMessage = exports.downloadEncryptedContent = exports.downloadContentFromMessage = exports.getUrlFromDirectPath = exports.encryptedStream = exports.getHttpStream = exports.generateThumbnail = exports.getStream = exports.toBuffer = exports.toReadable = exports.getAudioDuration = exports.mediaMessageSHA256B64 = exports.generateProfilePicture = exports.encodeBase64EncodedStringForUpload = exports.extractImageThumb = exports.getMediaKeys = exports.hkdfInfoKey = void 0;
 const boom_1 = require("@hapi/boom");
 const child_process_1 = require("child_process");
 const Crypto = __importStar(require("crypto"));
@@ -39,7 +39,7 @@ const crypto_1 = require("./crypto");
 const generics_1 = require("./generics");
 const getTmpFilesDirectory = () => (0, os_1.tmpdir)();
 const getImageProcessingLibrary = async () => {
-    const [jimp, sharp] = await Promise.all([
+    const [_jimp, sharp] = await Promise.all([
         (async () => {
             const jimp = await (Promise.resolve().then(() => __importStar(require('jimp'))).catch(() => { }));
             return jimp;
@@ -52,20 +52,14 @@ const getImageProcessingLibrary = async () => {
     if (sharp) {
         return { sharp };
     }
+    const jimp = (_jimp === null || _jimp === void 0 ? void 0 : _jimp.default) || _jimp;
     if (jimp) {
         return { jimp };
     }
     throw new boom_1.Boom('No image processing library available');
 };
 const hkdfInfoKey = (type) => {
-    let str = type;
-    if (type === 'sticker') {
-        str = 'image';
-    }
-    if (type === 'md-app-state') {
-        str = 'App State';
-    }
-    const hkdfInfo = str[0].toUpperCase() + str.slice(1);
+    const hkdfInfo = Defaults_1.MEDIA_HKDF_KEY_MAPPING[type];
     return `WhatsApp ${hkdfInfo} Keys`;
 };
 exports.hkdfInfoKey = hkdfInfoKey;
@@ -99,29 +93,54 @@ const extractVideoThumb = async (path, destPath, time, size) => new Promise((res
     });
 });
 const extractImageThumb = async (bufferOrFilePath, width = 32) => {
+    var _a, _b;
     if (bufferOrFilePath instanceof stream_1.Readable) {
         bufferOrFilePath = await (0, exports.toBuffer)(bufferOrFilePath);
     }
     const lib = await getImageProcessingLibrary();
-    if ('sharp' in lib) {
-        const result = await lib.sharp.default(bufferOrFilePath)
+    if ('sharp' in lib && typeof ((_a = lib.sharp) === null || _a === void 0 ? void 0 : _a.default) === 'function') {
+        const img = lib.sharp.default(bufferOrFilePath);
+        const dimensions = await img.metadata();
+        const buffer = await img
             .resize(width)
             .jpeg({ quality: 50 })
             .toBuffer();
-        return result;
+        return {
+            buffer,
+            original: {
+                width: dimensions.width,
+                height: dimensions.height,
+            },
+        };
     }
-    else {
+    else if ('jimp' in lib && typeof ((_b = lib.jimp) === null || _b === void 0 ? void 0 : _b.read) === 'function') {
         const { read, MIME_JPEG, RESIZE_BILINEAR, AUTO } = lib.jimp;
         const jimp = await read(bufferOrFilePath);
-        const result = await jimp
+        const dimensions = {
+            width: jimp.getWidth(),
+            height: jimp.getHeight()
+        };
+        const buffer = await jimp
             .quality(50)
             .resize(width, AUTO, RESIZE_BILINEAR)
             .getBufferAsync(MIME_JPEG);
-        return result;
+        return {
+            buffer,
+            original: dimensions
+        };
+    }
+    else {
+        throw new boom_1.Boom('No image processing library available');
     }
 };
 exports.extractImageThumb = extractImageThumb;
+const encodeBase64EncodedStringForUpload = (b64) => (encodeURIComponent(b64
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/\=+$/, '')));
+exports.encodeBase64EncodedStringForUpload = encodeBase64EncodedStringForUpload;
 const generateProfilePicture = async (mediaUpload) => {
+    var _a, _b;
     let bufferOrFilePath;
     if (Buffer.isBuffer(mediaUpload)) {
         bufferOrFilePath = mediaUpload;
@@ -134,7 +153,7 @@ const generateProfilePicture = async (mediaUpload) => {
     }
     const lib = await getImageProcessingLibrary();
     let img;
-    if ('sharp' in lib) {
+    if ('sharp' in lib && typeof ((_a = lib.sharp) === null || _a === void 0 ? void 0 : _a.default) === 'function') {
         img = lib.sharp.default(bufferOrFilePath)
             .resize(640, 640)
             .jpeg({
@@ -142,7 +161,7 @@ const generateProfilePicture = async (mediaUpload) => {
         })
             .toBuffer();
     }
-    else {
+    else if ('jimp' in lib && typeof ((_b = lib.jimp) === null || _b === void 0 ? void 0 : _b.read) === 'function') {
         const { read, MIME_JPEG, RESIZE_BILINEAR } = lib.jimp;
         const jimp = await read(bufferOrFilePath);
         const min = Math.min(jimp.getWidth(), jimp.getHeight());
@@ -151,6 +170,9 @@ const generateProfilePicture = async (mediaUpload) => {
             .quality(50)
             .resize(640, 640, RESIZE_BILINEAR)
             .getBufferAsync(MIME_JPEG);
+    }
+    else {
+        throw new boom_1.Boom('No image processing library available');
     }
     return {
         img: await img,
@@ -213,9 +235,16 @@ exports.getStream = getStream;
 async function generateThumbnail(file, mediaType, options) {
     var _a;
     let thumbnail;
+    let originalImageDimensions;
     if (mediaType === 'image') {
-        const buff = await (0, exports.extractImageThumb)(file);
-        thumbnail = buff.toString('base64');
+        const { buffer, original } = await (0, exports.extractImageThumb)(file);
+        thumbnail = buffer.toString('base64');
+        if (original.width && original.height) {
+            originalImageDimensions = {
+                width: original.width,
+                height: original.height,
+            };
+        }
     }
     else if (mediaType === 'video') {
         const imgFilename = (0, path_1.join)(getTmpFilesDirectory(), (0, generics_1.generateMessageID)() + '.jpg');
@@ -229,7 +258,10 @@ async function generateThumbnail(file, mediaType, options) {
             (_a = options.logger) === null || _a === void 0 ? void 0 : _a.debug('could not generate video thumb: ' + err);
         }
     }
-    return thumbnail;
+    return {
+        thumbnail,
+        originalImageDimensions
+    };
 }
 exports.generateThumbnail = generateThumbnail;
 const getHttpStream = async (url, options = {}) => {
@@ -329,7 +361,7 @@ exports.downloadContentFromMessage = downloadContentFromMessage;
  * Decrypts and downloads an AES256-CBC encrypted file given the keys.
  * Assumes the SHA256 of the plaintext is appended to the end of the ciphertext
  * */
-const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startByte, endByte } = {}) => {
+const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startByte, endByte, options } = {}) => {
     let bytesFetched = 0;
     let startChunk = 0;
     let firstBlockIsIV = false;
@@ -344,6 +376,7 @@ const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startB
     }
     const endChunk = endByte ? toSmallestChunkSize(endByte || 0) + AES_CHUNK_SIZE : undefined;
     const headers = {
+        ...(options === null || options === void 0 ? void 0 : options.headers) || {},
         Origin: Defaults_1.DEFAULT_ORIGIN,
     };
     if (startChunk || endChunk) {
@@ -354,6 +387,7 @@ const downloadEncryptedContent = async (downloadUrl, { cipherKey, iv }, { startB
     }
     // download the message
     const fetched = await (0, exports.getHttpStream)(downloadUrl, {
+        ...options || {},
         headers,
         maxBodyLength: Infinity,
         maxContentLength: Infinity,
@@ -427,7 +461,7 @@ function extensionForMediaMessage(message) {
     return extension;
 }
 exports.extensionForMediaMessage = extensionForMediaMessage;
-const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger }, refreshMediaConn) => {
+const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger, options }, refreshMediaConn) => {
     return async (stream, { mediaType, fileEncSha256B64, timeoutMs }) => {
         var _a, _b;
         const { default: axios } = await Promise.resolve().then(() => __importStar(require('axios')));
@@ -440,6 +474,7 @@ const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger }, refreshM
             chunks.push(chunk);
         }
         const reqBody = Buffer.concat(chunks);
+        fileEncSha256B64 = (0, exports.encodeBase64EncodedStringForUpload)(fileEncSha256B64);
         for (const { hostname, maxContentLengthBytes } of hosts) {
             logger.debug(`uploading to "${hostname}"`);
             const auth = encodeURIComponent(uploadInfo.auth); // the auth token
@@ -450,7 +485,9 @@ const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger }, refreshM
                     throw new boom_1.Boom(`Body too large for "${hostname}"`, { statusCode: 413 });
                 }
                 const body = await axios.post(url, reqBody, {
+                    ...options,
                     headers: {
+                        ...options.headers || {},
                         'Content-Type': 'application/octet-stream',
                         'Origin': Defaults_1.DEFAULT_ORIGIN
                     },
@@ -488,7 +525,6 @@ const getWAUploadToServer = ({ customUploadHosts, fetchAgent, logger }, refreshM
     };
 };
 exports.getWAUploadToServer = getWAUploadToServer;
-const GCM_AUTH_TAG_LENGTH = 128 >> 3;
 const getMediaRetryKey = (mediaKey) => {
     return (0, crypto_1.hkdf)(mediaKey, 32, { info: 'WhatsApp Media Retry Notification' });
 };

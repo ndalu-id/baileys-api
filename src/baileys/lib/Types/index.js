@@ -21,7 +21,6 @@ __exportStar(require("./Chat"), exports);
 __exportStar(require("./Contact"), exports);
 __exportStar(require("./State"), exports);
 __exportStar(require("./Message"), exports);
-__exportStar(require("./Legacy"), exports);
 __exportStar(require("./Socket"), exports);
 __exportStar(require("./Events"), exports);
 __exportStar(require("./Product"), exports);

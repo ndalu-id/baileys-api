@@ -82,6 +82,8 @@
 
     <script>
 
+        console.log("\n\n-----------------\nSTILL ON PROGRESS\n-----------------\n\n")
+
         let contact = []
         let group = []
         let status = []
@@ -106,6 +108,7 @@
                     })
                 })
                 const res = await req.json()
+                console.log(res)
                 return res
             }
         }
@@ -150,12 +153,12 @@
         async function showMessage(token) {
             if ( token ) {
                 const data = await getMessages(token)
-                if ( Array.isArray(data) ) {
-                    data.map( x => {
-                        if ( x[0].endsWith('@s.whatsapp.net') ) {
+                if ( data?.json?.messages && Array.isArray(data?.json?.messages) ) {
+                    data?.json?.messages.map( x => {
+                        if ( x?.key?.remoteJid?.endsWith('@s.whatsapp.net') ) {
                             contact.push(x)
                         }
-                        else if ( x[0].endsWith('@g.us') ) {
+                        else if ( x?.key?.remoteJid?.endsWith('@g.us') ) {
                             group.push(x)
                         }
                         else {

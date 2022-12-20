@@ -60,9 +60,4 @@ declare type DownloadMediaMessageContext = {
 export declare const downloadMediaMessage: (message: WAMessage, type: 'buffer' | 'stream', options: MediaDownloadOptions, ctx?: DownloadMediaMessageContext) => Promise<Buffer | import("stream").Transform>;
 /** Checks whether the given message is a media message; if it is returns the inner content */
 export declare const assertMediaContent: (content: proto.IMessage | null | undefined) => proto.Message.IVideoMessage | proto.Message.IImageMessage | proto.Message.IAudioMessage | proto.Message.IDocumentMessage | proto.Message.IStickerMessage;
-/**
- * this is an experimental patch to make buttons work
- * Don't know how it works, but it does for now
- */
-export declare const patchMessageForMdIfRequired: (message: proto.IMessage) => proto.IMessage;
 export {};

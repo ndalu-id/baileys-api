@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isWABusinessPlatform = exports.getCodeFromWSError = exports.getCallStatusFromNode = exports.getErrorCodeFromStreamError = exports.getStatusFromReceiptType = exports.generateMdTagPrefix = exports.fetchLatestWaWebVersion = exports.fetchLatestBaileysVersion = exports.printQRIfNecessaryListener = exports.bindWaitForConnectionUpdate = exports.bindWaitForEvent = exports.generateMessageID = exports.promiseTimeout = exports.delayCancellable = exports.delay = exports.debouncedTimeout = exports.unixTimestampSeconds = exports.toNumber = exports.encodeBigEndian = exports.generateRegistrationId = exports.encodeWAMessage = exports.unpadRandomMax16 = exports.writeRandomPadMax16 = exports.BufferJSON = exports.Browsers = void 0;
+exports.trimUndefineds = exports.isWABusinessPlatform = exports.getCodeFromWSError = exports.getCallStatusFromNode = exports.getErrorCodeFromStreamError = exports.getStatusFromReceiptType = exports.generateMdTagPrefix = exports.fetchLatestWaWebVersion = exports.fetchLatestBaileysVersion = exports.printQRIfNecessaryListener = exports.bindWaitForConnectionUpdate = exports.bindWaitForEvent = exports.generateMessageID = exports.promiseTimeout = exports.delayCancellable = exports.delay = exports.debouncedTimeout = exports.unixTimestampSeconds = exports.toNumber = exports.encodeBigEndian = exports.generateRegistrationId = exports.encodeWAMessage = exports.unpadRandomMax16 = exports.writeRandomPadMax16 = exports.BufferJSON = exports.Browsers = void 0;
 const boom_1 = require("@hapi/boom");
 const axios_1 = __importDefault(require("axios"));
 const crypto_1 = require("crypto");
@@ -201,7 +201,7 @@ exports.bindWaitForConnectionUpdate = bindWaitForConnectionUpdate;
 const printQRIfNecessaryListener = (ev, logger) => {
     ev.on('connection.update', async ({ qr }) => {
         if (qr) {
-            const QR = await Promise.resolve().then(() => __importStar(require('qrcode-terminal'))).catch(err => {
+            const QR = await Promise.resolve().then(() => __importStar(require('qrcode-terminal'))).catch(() => {
                 logger.error('QR code terminal not added as dependency');
             });
             QR === null || QR === void 0 ? void 0 : QR.generate(qr, { small: true });
@@ -213,10 +213,13 @@ exports.printQRIfNecessaryListener = printQRIfNecessaryListener;
  * utility that fetches latest baileys version from the master branch.
  * Use to ensure your WA connection is always on the latest version
  */
-const fetchLatestBaileysVersion = async () => {
+const fetchLatestBaileysVersion = async (options = {}) => {
     const URL = 'https://raw.githubusercontent.com/adiwajshing/Baileys/master/src/Defaults/baileys-version.json';
     try {
-        const result = await axios_1.default.get(URL, { responseType: 'json' });
+        const result = await axios_1.default.get(URL, {
+            ...options,
+            responseType: 'json'
+        });
         return {
             version: result.data.version,
             isLatest: true
@@ -235,9 +238,12 @@ exports.fetchLatestBaileysVersion = fetchLatestBaileysVersion;
  * A utility that fetches the latest web version of whatsapp.
  * Use to ensure your WA connection is always on the latest version
  */
-const fetchLatestWaWebVersion = async () => {
+const fetchLatestWaWebVersion = async (options) => {
     try {
-        const result = await axios_1.default.get('https://web.whatsapp.com/check-update?version=1&platform=web', { responseType: 'json' });
+        const result = await axios_1.default.get('https://web.whatsapp.com/check-update?version=1&platform=web', {
+            ...options,
+            responseType: 'json'
+        });
         const version = result.data.currentVersion.split('.');
         return {
             version: [+version[0], +version[1], +version[2]],
@@ -348,3 +354,12 @@ const isWABusinessPlatform = (platform) => {
     return platform === 'smbi' || platform === 'smba';
 };
 exports.isWABusinessPlatform = isWABusinessPlatform;
+function trimUndefineds(obj) {
+    for (const key in obj) {
+        if (typeof obj[key] === 'undefined') {
+            delete obj[key];
+        }
+    }
+    return obj;
+}
+exports.trimUndefineds = trimUndefineds;

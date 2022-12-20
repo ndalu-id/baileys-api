@@ -116,7 +116,7 @@ const makeGroupsSocket = (config) => {
          * @param key the key of the invite message, or optionally only provide the jid of the person who sent the invite
          * @param inviteMessage the message to accept
          */
-        groupAcceptInviteV4: async (key, inviteMessage) => {
+        groupAcceptInviteV4: ev.createBufferedFunction(async (key, inviteMessage) => {
             key = typeof key === 'string' ? { remoteJid: key } : key;
             const results = await groupQuery(inviteMessage.groupJid, 'set', [{
                     tag: 'accept',
@@ -126,7 +126,6 @@ const makeGroupsSocket = (config) => {
                         admin: key.remoteJid
                     }
                 }]);
-            const started = ev.buffer();
             // if we have the full message key
             // update the invite message to be expired
             if (key.id) {
@@ -160,11 +159,8 @@ const makeGroupsSocket = (config) => {
                 participant: key.remoteJid,
                 messageTimestamp: (0, Utils_1.unixTimestampSeconds)()
             }, 'notify');
-            if (started) {
-                await ev.flush();
-            }
             return results.attrs.from;
-        },
+        }),
         groupGetInviteInfo: async (code) => {
             const results = await groupQuery('@g.us', 'get', [{ tag: 'invite', attrs: { code } }]);
             return (0, exports.extractGroupMetadata)(results);
@@ -216,17 +212,17 @@ const makeGroupsSocket = (config) => {
 };
 exports.makeGroupsSocket = makeGroupsSocket;
 const extractGroupMetadata = (result) => {
-    var _a, _b;
+    var _a;
     const group = (0, WABinary_1.getBinaryNodeChild)(result, 'group');
     const descChild = (0, WABinary_1.getBinaryNodeChild)(group, 'description');
     let desc;
     let descId;
     if (descChild) {
-        desc = (_a = (0, WABinary_1.getBinaryNodeChild)(descChild, 'body')) === null || _a === void 0 ? void 0 : _a.content;
+        desc = (0, WABinary_1.getBinaryNodeChildString)(descChild, 'body');
         descId = descChild.attrs.id;
     }
     const groupId = group.attrs.id.includes('@') ? group.attrs.id : (0, WABinary_1.jidEncode)(group.attrs.id, 'g.us');
-    const eph = (_b = (0, WABinary_1.getBinaryNodeChild)(group, 'ephemeral')) === null || _b === void 0 ? void 0 : _b.attrs.expiration;
+    const eph = (_a = (0, WABinary_1.getBinaryNodeChild)(group, 'ephemeral')) === null || _a === void 0 ? void 0 : _a.attrs.expiration;
     const metadata = {
         id: groupId,
         subject: group.attrs.subject,

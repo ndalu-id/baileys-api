@@ -75,7 +75,7 @@ const decodeMessageStanza = (stanza, auth) => {
         fullMessage,
         category: stanza.attrs.category,
         author,
-        decryptionTask: (async () => {
+        async decrypt() {
             var _a;
             let decryptables = 0;
             if (Array.isArray(stanza.content)) {
@@ -130,7 +130,7 @@ const decodeMessageStanza = (stanza, auth) => {
                 fullMessage.messageStubType = WAProto_1.proto.WebMessageInfo.StubType.CIPHERTEXT;
                 fullMessage.messageStubParameters = [NO_MESSAGE_FOUND_ERROR_TEXT];
             }
-        })()
+        }
     };
 };
 exports.decodeMessageStanza = decodeMessageStanza;

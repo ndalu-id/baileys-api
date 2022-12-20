@@ -1,10 +1,72 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.initAuthCreds = exports.addTransactionCapability = void 0;
-const boom_1 = require("@hapi/boom");
+exports.initAuthCreds = exports.addTransactionCapability = exports.makeCacheableSignalKeyStore = void 0;
 const crypto_1 = require("crypto");
+const node_cache_1 = __importDefault(require("node-cache"));
 const crypto_2 = require("./crypto");
 const generics_1 = require("./generics");
+/**
+ * Adds caching capability to a SignalKeyStore
+ * @param store the store to add caching to
+ * @param logger to log trace events
+ * @param opts NodeCache options
+ */
+function makeCacheableSignalKeyStore(store, logger, opts) {
+    const cache = new node_cache_1.default({
+        ...opts || {},
+        useClones: false,
+    });
+    function getUniqueId(type, id) {
+        return `${type}.${id}`;
+    }
+    return {
+        async get(type, ids) {
+            const data = {};
+            const idsToFetch = [];
+            for (const id of ids) {
+                const item = cache.get(getUniqueId(type, id));
+                if (typeof item !== 'undefined') {
+                    data[id] = item;
+                }
+                else {
+                    idsToFetch.push(id);
+                }
+            }
+            if (idsToFetch.length) {
+                logger.trace({ items: idsToFetch.length }, 'loading from store');
+                const fetched = await store.get(type, idsToFetch);
+                for (const id of idsToFetch) {
+                    const item = fetched[id];
+                    if (item) {
+                        data[id] = item;
+                        cache.set(getUniqueId(type, id), item);
+                    }
+                }
+            }
+            return data;
+        },
+        async set(data) {
+            let keys = 0;
+            for (const type in data) {
+                for (const id in data[type]) {
+                    cache.set(getUniqueId(type, id), data[type][id]);
+                    keys += 1;
+                }
+            }
+            logger.trace({ keys }, 'updated cache');
+            await store.set(data);
+        },
+        async clear() {
+            var _a;
+            cache.flushAll();
+            await ((_a = store.clear) === null || _a === void 0 ? void 0 : _a.call(store));
+        }
+    };
+}
+exports.makeCacheableSignalKeyStore = makeCacheableSignalKeyStore;
 /**
  * Adds DB like transaction capability (https://en.wikipedia.org/wiki/Database_transaction) to the SignalKeyStore,
  * this allows batch read & write operations & improves the performance of the lib
@@ -24,9 +86,6 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
      * useful if these data points will be used together often
      * */
     const prefetch = async (type, ids) => {
-        if (!inTransaction) {
-            throw new boom_1.Boom('Cannot prefetch without transaction');
-        }
         const dict = transactionCache[type];
         const idsRequiringFetch = dict ? ids.filter(item => !(item in dict)) : ids;
         // only fetch if there are any items to fetch
@@ -68,10 +127,6 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
             }
         },
         isInTransaction: () => inTransaction,
-        prefetch: (type, ids) => {
-            logger.trace({ type, ids }, 'prefetching');
-            return prefetch(type, ids);
-        },
         transaction: async (work) => {
             // if we're already in a transaction,
             // just execute what needs to be executed -- no commit required
@@ -127,6 +182,7 @@ const initAuthCreds = () => {
         processedHistoryMessages: [],
         nextPreKeyId: 1,
         firstUnuploadedPreKeyId: 1,
+        accountSyncCounter: 0,
         accountSettings: {
             unarchiveChats: false
         }

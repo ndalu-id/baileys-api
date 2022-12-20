@@ -6,9 +6,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeEventBuffer = void 0;
 const events_1 = __importDefault(require("events"));
 const Types_1 = require("../Types");
+const generics_1 = require("./generics");
 const messages_1 = require("./messages");
 const process_message_1 = require("./process-message");
 const BUFFERABLE_EVENT = [
+    'messaging-history.set',
     'chats.upsert',
     'chats.update',
     'chats.delete',
@@ -29,15 +31,51 @@ const BUFFERABLE_EVENT_SET = new Set(BUFFERABLE_EVENT);
  */
 const makeEventBuffer = (logger) => {
     const ev = new events_1.default();
+    const historyCache = new Set();
     let data = makeBufferData();
-    let isBuffering = false;
-    let preBufferTask = Promise.resolve();
+    let buffersInProgress = 0;
     // take the generic event and fire it as a baileys event
     ev.on('event', (map) => {
         for (const event in map) {
             ev.emit(event, map[event]);
         }
     });
+    function buffer() {
+        buffersInProgress += 1;
+    }
+    function flush(force = false) {
+        // no buffer going on
+        if (!buffersInProgress) {
+            return false;
+        }
+        if (!force) {
+            // reduce the number of buffers in progress
+            buffersInProgress -= 1;
+            // if there are still some buffers going on
+            // then we don't flush now
+            if (buffersInProgress) {
+                return false;
+            }
+        }
+        const newData = makeBufferData();
+        const chatUpdates = Object.values(data.chatUpdates);
+        // gather the remaining conditional events so we re-queue them
+        let conditionalChatUpdatesLeft = 0;
+        for (const update of chatUpdates) {
+            if (update.conditional) {
+                conditionalChatUpdatesLeft += 1;
+                newData.chatUpdates[update.id] = update;
+                delete data.chatUpdates[update.id];
+            }
+        }
+        const consolidatedData = consolidateEvents(data);
+        if (Object.keys(consolidatedData).length) {
+            ev.emit('event', consolidatedData);
+        }
+        data = newData;
+        logger.trace({ conditionalChatUpdatesLeft }, 'released buffered events');
+        return true;
+    }
     return {
         process(handler) {
             const listener = (map) => {
@@ -49,38 +87,28 @@ const makeEventBuffer = (logger) => {
             };
         },
         emit(event, evData) {
-            if (isBuffering && BUFFERABLE_EVENT_SET.has(event)) {
-                append(data, event, evData, logger);
+            if (buffersInProgress && BUFFERABLE_EVENT_SET.has(event)) {
+                append(data, historyCache, event, evData, logger);
                 return true;
             }
             return ev.emit('event', { [event]: evData });
         },
-        processInBuffer(task) {
-            if (isBuffering) {
-                preBufferTask = Promise.allSettled([preBufferTask, task]);
-            }
+        isBuffering() {
+            return buffersInProgress > 0;
         },
-        buffer() {
-            if (!isBuffering) {
-                logger.trace('buffering events');
-                isBuffering = true;
-                return true;
-            }
-            return false;
-        },
-        async flush() {
-            if (!isBuffering) {
-                return;
-            }
-            logger.trace('releasing buffered events...');
-            await preBufferTask;
-            isBuffering = false;
-            const consolidatedData = consolidateEvents(data);
-            if (Object.keys(consolidatedData).length) {
-                ev.emit('event', consolidatedData);
-            }
-            data = makeBufferData();
-            logger.trace('released buffered events');
+        buffer,
+        flush,
+        createBufferedFunction(work) {
+            return async (...args) => {
+                buffer();
+                try {
+                    const result = await work(...args);
+                    return result;
+                }
+                finally {
+                    flush();
+                }
+            };
         },
         on: (...args) => ev.on(...args),
         off: (...args) => ev.off(...args),
@@ -90,6 +118,13 @@ const makeEventBuffer = (logger) => {
 exports.makeEventBuffer = makeEventBuffer;
 const makeBufferData = () => {
     return {
+        historySets: {
+            chats: {},
+            messages: {},
+            contacts: {},
+            isLatest: false,
+            empty: true
+        },
         chatUpserts: {},
         chatUpdates: {},
         chatDeletes: new Set(),
@@ -103,36 +138,90 @@ const makeBufferData = () => {
         groupUpdates: {}
     };
 };
-function append(data, event, eventData, logger) {
+function append(data, historyCache, event, eventData, logger) {
+    var _a, _b, _c;
     switch (event) {
+        case 'messaging-history.set':
+            for (const chat of eventData.chats) {
+                const existingChat = data.historySets.chats[chat.id];
+                if (existingChat) {
+                    existingChat.endOfHistoryTransferType = chat.endOfHistoryTransferType;
+                }
+                if (!existingChat && !historyCache.has(chat.id)) {
+                    data.historySets.chats[chat.id] = chat;
+                    historyCache.add(chat.id);
+                    absorbingChatUpdate(chat);
+                }
+            }
+            for (const contact of eventData.contacts) {
+                const existingContact = data.historySets.contacts[contact.id];
+                if (existingContact) {
+                    Object.assign(existingContact, (0, generics_1.trimUndefineds)(contact));
+                }
+                else {
+                    const historyContactId = `c:${contact.id}`;
+                    const hasAnyName = contact.notify || contact.name || contact.verifiedName;
+                    if (!historyCache.has(historyContactId) || hasAnyName) {
+                        data.historySets.contacts[contact.id] = contact;
+                        historyCache.add(historyContactId);
+                    }
+                }
+            }
+            for (const message of eventData.messages) {
+                const key = stringifyMessageKey(message.key);
+                const existingMsg = data.historySets.messages[key];
+                if (!existingMsg && !historyCache.has(key)) {
+                    data.historySets.messages[key] = message;
+                    historyCache.add(key);
+                }
+            }
+            data.historySets.empty = false;
+            data.historySets.isLatest = eventData.isLatest || data.historySets.isLatest;
+            break;
         case 'chats.upsert':
             for (const chat of eventData) {
-                let upsert = data.chatUpserts[chat.id] || {};
-                upsert = concatChats(upsert, chat);
-                if (data.chatUpdates[chat.id]) {
-                    logger.debug({ chatId: chat.id }, 'absorbed chat update in chat upsert');
-                    upsert = concatChats(data.chatUpdates[chat.id], upsert);
-                    delete data.chatUpdates[chat.id];
+                let upsert = data.chatUpserts[chat.id];
+                if (!upsert) {
+                    upsert = data.historySets[chat.id];
+                    if (upsert) {
+                        logger.debug({ chatId: chat.id }, 'absorbed chat upsert in chat set');
+                    }
                 }
+                if (upsert) {
+                    upsert = concatChats(upsert, chat);
+                }
+                else {
+                    upsert = chat;
+                    data.chatUpserts[chat.id] = upsert;
+                }
+                absorbingChatUpdate(upsert);
                 if (data.chatDeletes.has(chat.id)) {
                     data.chatDeletes.delete(chat.id);
                 }
-                data.chatUpserts[chat.id] = upsert;
             }
             break;
         case 'chats.update':
             for (const update of eventData) {
                 const chatId = update.id;
-                // if there is an existing upsert, merge the update into it
-                const upsert = data.chatUpserts[chatId];
-                if (upsert) {
-                    concatChats(upsert, update);
+                const conditionMatches = update.conditional ? update.conditional(data) : true;
+                if (conditionMatches) {
+                    delete update.conditional;
+                    // if there is an existing upsert, merge the update into it
+                    const upsert = data.historySets.chats[chatId] || data.chatUpserts[chatId];
+                    if (upsert) {
+                        concatChats(upsert, update);
+                    }
+                    else {
+                        // merge the update into the existing update
+                        const chatUpdate = data.chatUpdates[chatId] || {};
+                        data.chatUpdates[chatId] = concatChats(chatUpdate, update);
+                    }
                 }
-                else {
-                    // merge the update into the existing update
-                    const chatUpdate = data.chatUpdates[chatId] || {};
-                    data.chatUpdates[chatId] = concatChats(chatUpdate, update);
+                else if (conditionMatches === undefined) {
+                    // condition yet to be fulfilled
+                    data.chatUpdates[chatId] = update;
                 }
+                // otherwise -- condition not met, update is invalid
                 // if the chat has been updated
                 // ignore any existing chat delete
                 if (data.chatDeletes.has(chatId)) {
@@ -142,7 +231,9 @@ function append(data, event, eventData, logger) {
             break;
         case 'chats.delete':
             for (const chatId of eventData) {
-                data.chatDeletes.add(chatId);
+                if (!data.chatDeletes.has(chatId)) {
+                    data.chatDeletes.add(chatId);
+                }
                 // remove any prior updates & upserts
                 if (data.chatUpdates[chatId]) {
                     delete data.chatUpdates[chatId];
@@ -150,17 +241,31 @@ function append(data, event, eventData, logger) {
                 if (data.chatUpserts[chatId]) {
                     delete data.chatUpserts[chatId];
                 }
+                if (data.historySets.chats[chatId]) {
+                    delete data.historySets.chats[chatId];
+                }
             }
             break;
         case 'contacts.upsert':
             for (const contact of eventData) {
-                let upsert = data.contactUpserts[contact.id] || {};
-                upsert = Object.assign(upsert, contact);
+                let upsert = data.contactUpserts[contact.id];
+                if (!upsert) {
+                    upsert = data.historySets.contacts[contact.id];
+                    if (upsert) {
+                        logger.debug({ contactId: contact.id }, 'absorbed contact upsert in contact set');
+                    }
+                }
+                if (upsert) {
+                    upsert = Object.assign(upsert, (0, generics_1.trimUndefineds)(contact));
+                }
+                else {
+                    upsert = contact;
+                    data.contactUpserts[contact.id] = upsert;
+                }
                 if (data.contactUpdates[contact.id]) {
-                    upsert = Object.assign(data.contactUpdates[contact.id], upsert);
+                    upsert = Object.assign(data.contactUpdates[contact.id], (0, generics_1.trimUndefineds)(contact));
                     delete data.contactUpdates[contact.id];
                 }
-                data.contactUpserts[contact.id] = upsert;
             }
             break;
         case 'contacts.update':
@@ -168,7 +273,7 @@ function append(data, event, eventData, logger) {
             for (const update of contactUpdates) {
                 const id = update.id;
                 // merge into prior upsert
-                const upsert = data.contactUpserts[update.id];
+                const upsert = data.historySets.contacts[id] || data.contactUpserts[id];
                 if (upsert) {
                     Object.assign(upsert, update);
                 }
@@ -183,35 +288,46 @@ function append(data, event, eventData, logger) {
             const { messages, type } = eventData;
             for (const message of messages) {
                 const key = stringifyMessageKey(message.key);
-                const existing = data.messageUpserts[key];
+                let existing = (_a = data.messageUpserts[key]) === null || _a === void 0 ? void 0 : _a.message;
+                if (!existing) {
+                    existing = data.historySets.messages[key];
+                    if (existing) {
+                        logger.debug({ messageId: key }, 'absorbed message upsert in message set');
+                    }
+                }
                 if (existing) {
-                    message.messageTimestamp = existing.message.messageTimestamp;
+                    message.messageTimestamp = existing.messageTimestamp;
                 }
                 if (data.messageUpdates[key]) {
                     logger.debug('absorbed prior message update in message upsert');
                     Object.assign(message, data.messageUpdates[key].update);
                     delete data.messageUpdates[key];
                 }
-                data.messageUpserts[key] = {
-                    message,
-                    type: type === 'notify' || (existing === null || existing === void 0 ? void 0 : existing.type) === 'notify'
-                        ? 'notify'
-                        : type
-                };
+                if (data.historySets.messages[key]) {
+                    data.historySets.messages[key] = message;
+                }
+                else {
+                    data.messageUpserts[key] = {
+                        message,
+                        type: type === 'notify' || ((_b = data.messageUpserts[key]) === null || _b === void 0 ? void 0 : _b.type) === 'notify'
+                            ? 'notify'
+                            : type
+                    };
+                }
             }
             break;
         case 'messages.update':
             const msgUpdates = eventData;
             for (const { key, update } of msgUpdates) {
                 const keyStr = stringifyMessageKey(key);
-                const existing = data.messageUpserts[keyStr];
+                const existing = data.historySets.messages[keyStr] || ((_c = data.messageUpserts[keyStr]) === null || _c === void 0 ? void 0 : _c.message);
                 if (existing) {
-                    Object.assign(existing.message, update);
+                    Object.assign(existing, update);
                     // if the message was received & read by us
                     // the chat counter must have been incremented
                     // so we need to decrement it
                     if (update.status === Types_1.WAMessageStatus.READ && !key.fromMe) {
-                        decrementChatReadCounterIfMsgDidUnread(existing.message);
+                        decrementChatReadCounterIfMsgDidUnread(existing);
                     }
                 }
                 else {
@@ -227,7 +343,9 @@ function append(data, event, eventData, logger) {
                 const { keys } = deleteData;
                 for (const key of keys) {
                     const keyStr = stringifyMessageKey(key);
-                    data.messageDeletes[keyStr] = key;
+                    if (!data.messageDeletes[keyStr]) {
+                        data.messageDeletes[keyStr] = key;
+                    }
                     if (data.messageUpserts[keyStr]) {
                         delete data.messageUpserts[keyStr];
                     }
@@ -275,18 +393,37 @@ function append(data, event, eventData, logger) {
             for (const update of groupUpdates) {
                 const id = update.id;
                 const groupUpdate = data.groupUpdates[id] || {};
-                data.groupUpdates[id] = Object.assign(groupUpdate, update);
+                if (!data.groupUpdates[id]) {
+                    data.groupUpdates[id] = Object.assign(groupUpdate, update);
+                }
             }
             break;
         default:
             throw new Error(`"${event}" cannot be buffered`);
+    }
+    function absorbingChatUpdate(existing) {
+        const chatId = existing.id;
+        const update = data.chatUpdates[chatId];
+        if (update) {
+            const conditionMatches = update.conditional ? update.conditional(data) : true;
+            if (conditionMatches) {
+                delete update.conditional;
+                logger.debug({ chatId }, 'absorbed chat update in existing chat');
+                Object.assign(existing, concatChats(update, existing));
+                delete data.chatUpdates[chatId];
+            }
+            else if (conditionMatches === false) {
+                logger.debug({ chatId }, 'chat update condition fail, removing');
+                delete data.chatUpdates[chatId];
+            }
+        }
     }
     function decrementChatReadCounterIfMsgDidUnread(message) {
         // decrement chat unread counter
         // if the message has already been marked read by us
         const chatId = message.key.remoteJid;
         const chat = data.chatUpdates[chatId] || data.chatUpserts[chatId];
-        if ((0, process_message_1.isRealMessage)(message)
+        if ((0, process_message_1.isRealMessage)(message, '')
             && (0, process_message_1.shouldIncrementChatUnread)(message)
             && typeof (chat === null || chat === void 0 ? void 0 : chat.unreadCount) === 'number'
             && chat.unreadCount > 0) {
@@ -300,6 +437,14 @@ function append(data, event, eventData, logger) {
 }
 function consolidateEvents(data) {
     const map = {};
+    if (!data.historySets.empty) {
+        map['messaging-history.set'] = {
+            chats: Object.values(data.historySets.chats),
+            messages: Object.values(data.historySets.messages),
+            contacts: Object.values(data.historySets.contacts),
+            isLatest: data.historySets.isLatest
+        };
+    }
     const chatUpsertList = Object.values(data.chatUpserts);
     if (chatUpsertList.length) {
         map['chats.upsert'] = chatUpsertList;

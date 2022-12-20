@@ -46,7 +46,11 @@ exports.isJidGroup = isJidGroup;
 const isJidStatusBroadcast = (jid) => jid === 'status@broadcast';
 exports.isJidStatusBroadcast = isJidStatusBroadcast;
 const jidNormalizedUser = (jid) => {
-    const { user, server } = (0, exports.jidDecode)(jid);
+    const result = (0, exports.jidDecode)(jid);
+    if (!result) {
+        return '';
+    }
+    const { user, server } = result;
     return (0, exports.jidEncode)(user, server === 'c.us' ? 's.whatsapp.net' : server);
 };
 exports.jidNormalizedUser = jidNormalizedUser;

@@ -1,4 +1,3 @@
-import makeWALegacySocket from './LegacySocket';
 import makeWASocket from './Socket';
 export * from '../WAProto';
 export * from './Utils';
@@ -6,8 +5,5 @@ export * from './Types';
 export * from './Store';
 export * from './Defaults';
 export * from './WABinary';
-export declare type WALegacySocket = ReturnType<typeof makeWALegacySocket>;
-export { makeWALegacySocket };
 export declare type WASocket = ReturnType<typeof makeWASocket>;
-export declare type AnyWASocket = WASocket | WALegacySocket;
 export default makeWASocket;

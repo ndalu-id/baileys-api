@@ -1,10 +1,11 @@
-/// <reference types="ws" />
 /// <reference types="node" />
+/// <reference types="ws" />
 import { UserFacingSocketConfig } from '../Types';
 declare const makeWASocket: (config: UserFacingSocketConfig) => {
     getOrderDetails: (orderId: string, tokenBase64: string) => Promise<import("../Types").OrderDetails>;
-    getCatalog: (jid?: string | undefined, limit?: number) => Promise<{
+    getCatalog: ({ jid, limit, cursor }: import("../Types").GetCatalogOptions) => Promise<{
         products: import("../Types").Product[];
+        nextPageCursor: string | undefined;
     }>;
     getCollections: (jid?: string | undefined, limit?: number) => Promise<{
         collections: import("../Types").CatalogCollection[];
@@ -14,10 +15,9 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
         deleted: number;
     }>;
     productUpdate: (productId: string, update: import("../Types").ProductUpdate) => Promise<import("../Types").Product>;
-    sendMessageAck: ({ tag, attrs }: import("..").BinaryNode, extraAttrs?: {
-        [key: string]: string;
-    }) => Promise<void>;
+    sendMessageAck: ({ tag, attrs }: import("..").BinaryNode) => Promise<void>;
     sendRetryRequest: (node: import("..").BinaryNode, forceIncludeKeys?: boolean) => Promise<void>;
+    rejectCall: (callId: string, callFrom: string) => Promise<void>;
     getPrivacyTokens: (jids: string[]) => Promise<import("..").BinaryNode>;
     assertSessions: (jids: string[], force: boolean) => Promise<boolean>;
     relayMessage: (jid: string, message: import("../Types").WAProto.IMessage, { messageId: msgId, participant, additionalAttributes, useUserDevicesCache, cachedGroupMetadata }: import("../Types").MessageRelayOptions) => Promise<string>;
@@ -56,7 +56,7 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     upsertMessage: (msg: import("../Types").WAProto.IWebMessageInfo, type: import("../Types").MessageUpsertType) => Promise<void>;
     appPatch: (patchCreate: import("../Types").WAPatchCreate) => Promise<void>;
     sendPresenceUpdate: (type: import("../Types").WAPresence, toJid?: string | undefined) => Promise<void>;
-    presenceSubscribe: (toJid: string) => Promise<void>;
+    presenceSubscribe: (toJid: string, tcToken?: Buffer | undefined) => Promise<void>;
     profilePictureUrl: (jid: string, type?: "image" | "preview", timeoutMs?: number | undefined) => Promise<string | undefined>;
     onWhatsApp: (...jids: string[]) => Promise<{
         exists: boolean;
@@ -72,16 +72,16 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     updateProfileName: (name: string) => Promise<void>;
     updateBlockStatus: (jid: string, action: "block" | "unblock") => Promise<void>;
     getBusinessProfile: (jid: string) => Promise<void | import("../Types").WABusinessProfile>;
-    resyncAppState: (collections: readonly ("critical_block" | "critical_unblock_low" | "regular_high" | "regular_low" | "regular")[], recvChats: import("../Types").InitialReceivedChatsState | undefined) => Promise<void>;
+    resyncAppState: (collections: readonly ("critical_block" | "critical_unblock_low" | "regular_high" | "regular_low" | "regular")[], isInitialSync: boolean) => Promise<void>;
     chatModify: (mod: import("../Types").ChatModification, jid: string) => Promise<void>;
-    resyncMainAppState: (ctx?: import("../Types").InitialReceivedChatsState | undefined) => Promise<void>;
     type: "md";
     ws: import("ws");
     ev: import("../Types").BaileysEventEmitter & {
-        process(handler: (events: Partial<import("../Types").BaileysEventMap<import("../Types").AuthenticationCreds>>) => void | Promise<void>): () => void;
-        buffer(): boolean;
-        flush(): Promise<void>;
-        processInBuffer(task: Promise<any>): any;
+        process(handler: (events: Partial<import("../Types").BaileysEventMap>) => void | Promise<void>): () => void;
+        buffer(): void;
+        createBufferedFunction<A extends any[], T_1>(work: (...args: A) => Promise<T_1>): (...args: A) => Promise<T_1>;
+        flush(force?: boolean | undefined): boolean;
+        isBuffering(): boolean;
     };
     authState: {
         creds: import("../Types").AuthenticationCreds;
@@ -94,10 +94,11 @@ declare const makeWASocket: (config: UserFacingSocketConfig) => {
     waitForSocketOpen: () => Promise<void>;
     sendRawMessage: (data: Buffer | Uint8Array) => Promise<void>;
     sendNode: (frame: import("..").BinaryNode) => Promise<void>;
-    logout: () => Promise<void>;
+    logout: (msg?: string | undefined) => Promise<void>;
     end: (error: Error | undefined) => void;
     onUnexpectedError: (error: Error, msg: string) => void;
     uploadPreKeys: (count?: number) => Promise<void>;
+    uploadPreKeysToServerIfRequired: () => Promise<void>;
     waitForConnectionUpdate: (check: (u: Partial<import("../Types").ConnectionState>) => boolean | undefined, timeoutMs?: number | undefined) => Promise<void>;
 };
 export default makeWASocket;
