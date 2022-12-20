@@ -31,7 +31,7 @@
                 <a href="/docs">docs</a>
             </li>
             <li>
-                <a href="/chats?token=test">chats default token</a>
+                <a href="#" onclick="myChats()">chats default token</a>
             </li>
         </ul>
     </nav>
@@ -124,6 +124,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', startConnection);
+
+        function myChats() {
+            if ( checkToken.value ) return window.location.href = '/chats?token='+checkToken.value
+        }
 
         // delete token / delete instance
         const deleteToken = document.querySelector('.delete-token')
