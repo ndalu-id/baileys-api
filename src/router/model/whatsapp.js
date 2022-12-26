@@ -12,6 +12,7 @@ let sock = []
 let qrcode = []
 let intervalStore = []
 let intervalConnCheck = []
+let counterQr = []
 
 const axios = require('axios')
 
@@ -25,13 +26,6 @@ const msgRetryCounterMap = () => MessageRetryMap = { }
 
 // start a connection
 const connectToWhatsApp = async (token, io) => {
-
-    console.log([
-        {
-            DEBUG: sock['test'],
-            FILE: fs.existsSync(`credentials/${token}`)
-        }
-    ])
 
     if ( typeof qrcode[token] !== 'undefined' ) {
         console.log(`> QRCODE ${token} IS READY`)
@@ -148,30 +142,21 @@ const connectToWhatsApp = async (token, io) => {
 
                 // CONNECTION CLOSE
                 if(connection === 'close') {
-                    // Experimental logic last connection check
-                    if((lastDisconnect.error)?.output?.statusCode === DisconnectReason.loggedOut) {
-                        console.log('Connection closed. You are logged out.')
-                        io.emit('message', {token: token, message: 'Connection closed. You are logged out.'})
-                        await clearConnection(token)
-                    } else {
-                        if ( (lastDisconnect.error)?.output?.statusCode === 408 ) {
-                            console.log( (lastDisconnect.error)?.output?.payload.error )
-                            io.emit('timeout', {token: token, message: 'Request Time-out.'})
-                            await clearConnection(token)
-                        } else if ( (lastDisconnect.error)?.output?.statusCode === 401 ) {
-                            console.log( update )
-                            io.emit('device_removed', {token: token, message: 'Device removed.'})
-                            await clearConnection(token)
-                        } else {
-                            delete qrcode[token]
-                            connectToWhatsApp(token, io)
-                            io.emit('message', {token: token, message: "Reconnecting"})
-                        }
+                    delete qrcode[token]
+                    if ( counterQr[token] < 5 ) {
+                        connectToWhatsApp(token, io)
+                        io.emit('connection-close', { token: token, message: 'Connecting'})
                     }
                 }
 				
                 // QRCODE
                 if (qr) {
+                    counterQr[token] = (counterQr[token] || 0)
+                    if ( counterQr[token] >= 5 ) {
+                        io.emit('connection-close', { token: token, message: 'QR CODE Time Out'})
+                        return await clearConnection(token)
+                    }
+                    counterQr[token]++
                     QRCode.toDataURL(qr, function (err, url) {
                         if (err) {
                             logger.error(err)
@@ -701,6 +686,7 @@ async function getChromeLates() {
 function clearConnection(token) {
     delete sock[token]
     delete qrcode[token]
+    delete counterQr[token]
     clearInterval(intervalStore[token])
     clearInterval(intervalConnCheck[token])
     fs.rmdir(`credentials/${token}`, { recursive: true }, (err) => {
@@ -708,7 +694,9 @@ function clearConnection(token) {
             throw err;
         }
         console.log(`credentials/${token} is deleted`);
+        return true
     });
+    return true
 }
 
 async function getImageBase64(token, msg) {
