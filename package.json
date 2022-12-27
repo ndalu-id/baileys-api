@@ -1,4 +1,48 @@
 {
   "name": "baileys-api",
-  "packageManager": "yarn@3.3.1"
+  "packageManager": "yarn@3.3.1",
+  "dependencies": {
+    "@adiwajshing/keyed-db": "^0.2.4",
+    "@hapi/boom": "^10.0.0",
+    "axios": "^0.27.2",
+    "body-parser": "^1.20.0",
+    "crypto-js": "^4.1.1",
+    "dotenv": "^16.0.1",
+    "express": "^4.18.1",
+    "futoin-hkdf": "^1.5.1",
+    "libsignal": "git+https://github.com/adiwajshing/libsignal-node",
+    "link-preview-js": "^2.1.19",
+    "music-metadata": "^8.0.1",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.1",
+    "pino": "^8.1.0",
+    "pino-pretty": "^8.1.0",
+    "protobufjs": "^7.0.0",
+    "qrcode": "^1.5.0",
+    "qrcode-terminal": "^0.12.0",
+    "sharp": "^0.30.7",
+    "socket.io": "^4.5.1",
+    "uuid": "^8.3.2",
+    "winston": "^3.8.1",
+    "winston-daily-rotate-file": "^4.7.1",
+    "ws": "^8.8.1"
+  },
+  "version": "1.0.0",
+  "description": "Whatsapp remote API multi device, multi instance. Based on baileys. Wanna more support contact me https://caket.org ||  https://ndalu.id",
+  "main": "index.js",
+  "repository": "https://github.com/ndalu-id/baileys-api",
+  "author": "ndalu-id <tofiknuryanto@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "win-dev": "set NODE_ENV=development&&nodemon src/index",
+    "win-start": "set NODE_ENV=production&&node src/index",
+    "dev": "NODE_ENV=development nodemon src/index",
+    "start": "NODE_ENV=production node src/index"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "credentials/*",
+      "logs/*"
+    ]
+  }
 }
