@@ -1,4 +1,6 @@
+/.yarn
+
 /node_modules
-/credentials
+/credentials/*
 /yarn-error.log
 /logs
