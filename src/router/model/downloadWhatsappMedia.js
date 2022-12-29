@@ -85,7 +85,6 @@ const downloadWhatsappMedia = async (req, res) => {
         if (messageType === 'audioMessage') {
             // download stream
             const stream = await downloadContentFromMessage(message.message.audioMessage, 'audio')
-            console.log(message.message?.audioMessage.mimetype)
             ext = message.message?.audioMessage.mimetype.split(';')[0]
             ext = ext.split('/')[1]
             fileLength = message.message.audioMessage.fileLength
