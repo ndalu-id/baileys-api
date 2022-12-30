@@ -44,7 +44,7 @@ const sendMedia = async (req, res) => {
 
     const { token, number, type, url, fileName, caption } = req.body
 
-    if ( token && number && type && url && caption ) {
+    if ( token && number && type && url ) {
         const sendingMediaMessage = await wa.sendMedia(token, number, type, url, fileName, caption)
         if (sendingMediaMessage) return res.send({status: true, data: sendingMediaMessage})
         return res.send({status: false, message: 'Check your connection'})
