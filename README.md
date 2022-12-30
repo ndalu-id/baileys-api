@@ -157,6 +157,7 @@ Update getMessage on retry sending message.
     REPLACE the [url] value with your webhook url, this action will send all actifity to your webhook
     It send 3 value, token, key, and message. Do something action with your webhook.
 
+    // deprecated, enntity to large
     If imageMessage or videoMessage using gif webhook will receive imageBase64 for your media // feature by request Liu Bei
 
 ## AUTOSTART INSTANCE

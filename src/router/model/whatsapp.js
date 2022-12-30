@@ -28,24 +28,24 @@ const msgRetryCounterMap = () => MessageRetryMap = { }
 const connectToWhatsApp = async (token, io) => {
 
     if ( typeof qrcode[token] !== 'undefined' ) {
-        console.log(`> QRCODE ${token} IS READY`)
-        return {
-            status: false,
-            sock: sock[token],
-            qrcode: qrcode[token],
-            message: "Please scann qrcode"
-        }
+      console.log(`> QRCODE ${token} IS READY`)
+      return {
+        status: false,
+        sock: sock[token],
+        qrcode: qrcode[token],
+        message: "Please scann qrcode"
+      }
     }
 
     try {
-        let number = sock[token].user.id.split(':')
-        number = number[0]+'@s.whatsapp.net'        
-        const ppUrl = await getPpUrl(token, number)
-        io.emit('connection-open', {token, user: sock[token].user, ppUrl})
-        return { status: true, message: 'Already connected'}
+      let number = sock[token].user.id.split(':')
+      number = number[0]+'@s.whatsapp.net'        
+      const ppUrl = await getPpUrl(token, number)
+      io.emit('connection-open', {token, user: sock[token].user, ppUrl})
+      return { status: true, message: 'Already connected'}
     } catch (error) {
-        io.emit('message', {token, message: `Try to connecting ${token}`})
-        console.log(`Try to connecting ${token}`)
+      io.emit('message', {token, message: `Try to connecting ${token}`})
+      console.log(`Try to connecting ${token}`)
     }
 
     const { state, saveCreds } = await useMultiFileAuthState(`credentials/${token}`)
@@ -73,50 +73,50 @@ const connectToWhatsApp = async (token, io) => {
     //     }
     // }, 10_000)
     intervalConnCheck[token] = setInterval(async () => {
-        const check = await connectToWhatsApp(token, io)
-        console.log(`> Interval check connection TOKEN: ${token}`, check)
+      const check = await connectToWhatsApp(token, io)
+      console.log(`> Interval check connection TOKEN: ${token}`, check)
     }, 1000 * 60 * 5)
 
     sock[token] = makeWASocket({
-        version,
-        // browser: ['Linux', 'Chrome', '103.0.5060.114'],
-        // browser: Browsers.macOS('Ubuntu'),
-        browser: ['Linux', 'Chrome', chrome?.data?.versions[0]?.version || '103.0.5060.114'],
-        syncFullHistory: true,
-        markOnlineOnConnect: false,
-        downloadHistory: true,
-        logger,
-        printQRInTerminal: true,
-        auth: state,
-        level: 'silent',
-        msgRetryCounterMap,
-        getMessage: async key => {
-            try {
-                let msg = await readJsonFromFile({token, name: 'messages'})
-                msg = msg.messages.filter( x => x.key.id === key.id)
-                winstonLog({tag: 'resend-message', token: token, json: {
-                    tag: 'resend-message',
-                    message: 'resend message',
-                    data: {
-                        token: token,
-                        msg: msg
-                    }
-                }})
-                return msg.message
-            } catch (error) {
-                winstonLog({tag: 'error', token: token, json: {
-                    tag: 'error-resend-message',
-                    message: 'error resend message',
-                    data: {
-                        token: token,
-                        error: error
-                    }
-                }})
-                return {
-                    conversation: 'Hello, this is resending message. But my message was lost. Please reply this message to tell me the message is lost.\n\nRegard web dev *ndalu.id*'
-                }
+      version,
+      // browser: ['Linux', 'Chrome', '103.0.5060.114'],
+      // browser: Browsers.macOS('Ubuntu'),
+      browser: ['Linux', 'Chrome', chrome?.data?.versions[0]?.version || '103.0.5060.114'],
+      syncFullHistory: true,
+      markOnlineOnConnect: false,
+      downloadHistory: true,
+      logger,
+      printQRInTerminal: true,
+      auth: state,
+      level: 'silent',
+      msgRetryCounterMap,
+      getMessage: async key => {
+        try {
+          let msg = await readJsonFromFile({token, name: 'messages'})
+          msg = msg.messages.filter( x => x.key.id === key.id)
+          winstonLog({tag: 'resend-message', token: token, json: {
+            tag: 'resend-message',
+            message: 'resend message',
+            data: {
+                token: token,
+                msg: msg
             }
-		}
+          }})
+          return msg.message
+        } catch (error) {
+          winstonLog({tag: 'error', token: token, json: {
+            tag: 'error-resend-message',
+            message: 'error resend message',
+            data: {
+              token: token,
+              error: error
+            }
+          }})
+          return {
+            conversation: 'Hello, this is resending message. But my message was lost. Please reply this message to tell me the message is lost.\n\nRegard web dev *ndalu.id*'
+          }
+        }
+      }
     })
 
     // store?.bind(sock[token].ev)
@@ -124,7 +124,6 @@ const connectToWhatsApp = async (token, io) => {
     sock[token].ev.process(
 		// events is a map for event name => event data
 		async(events) => {
-            // console.log(events)
 			// something about the connection changed
 			// maybe it closed, or we received all offline message or connection opened
 			if(events['connection.update']) {
@@ -220,17 +219,17 @@ const connectToWhatsApp = async (token, io) => {
 
 			// chat history received
 			if(events['chats.set']) {
-                const { chats, isLatest } = events['chats.set']
+        const { chats, isLatest } = events['chats.set']
 				console.log(`Token: ${token} event recv ${chats.length} chats (is latest: ${isLatest})`)
-                winstonLog({tag: 'chats.set', token: token, json: {
-                    tag: 'chats.set',
-                    message: 'chats set',
-                    data: {
-                        token: token,
-                        chatsSet: { chats, isLatest }
-                    }
-                }})
-                writeJsonToFile({token: token, name: 'chats', json: { chats, isLatest }})
+        winstonLog({tag: 'chats.set', token: token, json: {
+          tag: 'chats.set',
+          message: 'chats set',
+          data: {
+            token: token,
+            chatsSet: { chats, isLatest }
+          }
+        }})
+        writeJsonToFile({token: token, name: 'chats', json: { chats, isLatest }})
 			}
 
 			// message history received
@@ -253,12 +252,12 @@ const connectToWhatsApp = async (token, io) => {
 				const { contacts, isLatest } = events['contacts.set']
 				console.log(`Token: ${token} recv ${contacts.length} contacts (is latest: ${isLatest})`)
         winstonLog({tag: 'contacts-upsert', token: token, json: {
-            tag: 'contacts-upsert',
-            message: 'contacts upsert',
-            data: {
-                token: token,
-                contactsSet: { contacts, isLatest }
-            }
+          tag: 'contacts-upsert',
+          message: 'contacts upsert',
+          data: {
+            token: token,
+            contactsSet: { contacts, isLatest }
+          }
         }})
         writeJsonToFile({token: token, name: 'contacts', json: { contacts, isLatest }})
         manageIncomingMessage({token, upsert: events['contacts.set'], io})
@@ -350,61 +349,61 @@ const connectToWhatsApp = async (token, io) => {
 		}
 	)
 
-    sock[token].ev.on('messages.upsert', m => {
-        manageIncomingMessage({token, upsert: m, io})
-    })
+  sock[token].ev.on('messages.upsert', m => {
+    manageIncomingMessage({token, upsert: m, io})
+  })
 
-    return {
-        sock: sock[token],
-        qrcode: qrcode[token]
-    }
+  return {
+    sock: sock[token],
+    qrcode: qrcode[token]
+  }
 }
 
 // text message
 async function sendText(token, number, text) {
 
-    try {
-        if (Array.isArray(number)) {
-            for ( let i = 0;  i < number.length; i++ ) {
-                const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
-                const delay = i * 1000 * random
-                setTimeout(async () => {
-                    const sendingTextMessage = await sock[token].sendMessage(number[i], { text: text })
-                    winstonLog({tag: 'sendText', token: token, json: {
-                        tag: 'sendText',
-                        message: 'Sending text',
-                        data: {
-                            token: token,
-                            sendingTextMessage: sendingTextMessage
-                        }
-                    }})
-                }, delay)
-            }
-            return `Sending ${number.length} message start`
-        } else {
-            const sendingTextMessage = await sock[token].sendMessage(number, { text: text }) // awaiting sending message
-            winstonLog({tag: 'sendText', token: token, json: {
-                tag: 'sendText',
-                message: 'Sending text',
-                data: {
-                    token: token,
-                    sendingTextMessage: sendingTextMessage
-                }
-            }})
-            return sendingTextMessage
-        }
-    } catch (error) {
-        console.log(error)
-        winstonLog({tag: 'error', token: token, json: {
-            tag: 'error-sendText',
-            message: 'error send text',
+  try {
+    if (Array.isArray(number)) {
+      for ( let i = 0;  i < number.length; i++ ) {
+        const random = Math.floor(Math.random() * (process.env.MAX - process.env.MIN + 1) + process.env.MIN)
+        const delay = i * 1000 * random
+        setTimeout(async () => {
+          const sendingTextMessage = await sock[token].sendMessage(number[i], { text: text })
+          winstonLog({tag: 'sendText', token: token, json: {
+            tag: 'sendText',
+            message: 'Sending text',
             data: {
-                token: token,
-                error: error
+              token: token,
+              sendingTextMessage: sendingTextMessage
             }
-        }})
-        return false
+          }})
+        }, delay)
+      }
+      return `Sending ${number.length} message start`
+    } else {
+      const sendingTextMessage = await sock[token].sendMessage(number, { text: text }) // awaiting sending message
+      winstonLog({tag: 'sendText', token: token, json: {
+        tag: 'sendText',
+        message: 'Sending text',
+        data: {
+          token: token,
+          sendingTextMessage: sendingTextMessage
+        }
+      }})
+      return sendingTextMessage
     }
+  } catch (error) {
+    console.log(error)
+    winstonLog({tag: 'error', token: token, json: {
+      tag: 'error-sendText',
+      message: 'error send text',
+      data: {
+        token: token,
+        error: error
+      }
+    }})
+    return false
+  }
 
 }
 
@@ -674,7 +673,6 @@ function deleteCredentials(token) {
       }
       console.log(`credentials/${token} is deleted`);
     });
-    // fs.existsSync('credentials/'+token.json) && fs.unlinkSync('credentials/'+token.json) && fs.existsSync('credentials/store/'+token.json) && fs.unlinkSync('credentials/store/'+token.json)
     return {
       status: true, message: 'Deleting session and credential'
     }
@@ -773,75 +771,68 @@ function readJsonFromFile({token, name}) {
 async function manageIncomingMessage({token, upsert, io}) {
   upsert.isLatest = true
   writeJsonToFile({token, name: 'messages', json: upsert})
-  // console.log( upsert.messages )
-  // if(upsert?.type === 'notify') {
-    if ( !upsert?.messages ) return
-    for(const msg of upsert.messages) {
-      // if(!msg.key.fromMe && doReplies) {
-      // if(!msg.key.fromMe && msg.key.remoteJid !== 'status@broadcast') {
+  if ( !upsert?.messages ) return
+  for(const msg of upsert.messages) {
 
-      try {
-          const id = msg.key.remoteJid
-          const pushName = msg.pushName
-          const messageType = Object.keys (msg.message)[0] || null
-          const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || undefined
-          const contextInfo = msg.message?.extendedTextMessage?.contextInfo || undefined
-          const quotedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || undefined
-          const key = msg.key
-          const message = msg.message
+    try {
+        const id = msg.key.remoteJid
+        const pushName = msg.pushName
+        const messageType = Object.keys (msg.message)[0] || null
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || undefined
+        const contextInfo = msg.message?.extendedTextMessage?.contextInfo || undefined
+        const quotedMessage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage || undefined
+        const key = msg.key
+        const message = msg.message
 
-          await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
-          io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
+        await sock[token].sendPresenceUpdate('unavailable', key.remoteJid)
+        io.emit('message-upsert', {token, id, pushName, messageType, text, key, message})
 
-          var dataSend = {
-              token: token,
-              key: key,
-              message: message
-          }
+        var dataSend = {
+            token: token,
+            key: key,
+            message: message
+        }
 
-          if ( msg?.message?.imageMessage || msg?.message?.videoMessage) {
-              dataSend.imageBase64 = await getImageBase64(token, msg)
-          }
+        // if ( msg?.message?.imageMessage || msg?.message?.videoMessage) {
+        //     dataSend.imageBase64 = await getImageBase64(token, msg)
+        // }
 
-          console.log(`\n\n-----WEBHOOK LOG-----`)
-          console.log({
-            dataSend
-          })
+        console.log(`\n\n-----WEBHOOK LOG-----`)
+        console.log({
+          dataSend
+        })
 
-          /** START WEBHOOK */
-          const url = process.env.WEBHOOK
-          if ( url ) {
-            console.log(`Send Data To ${url}`)
-            axios.post(url, dataSend)
-              .then(function (response) {
-                  if ( process.env.NODE_ENV === 'development' ) {
-                      console.log(`\n> RESPONSE FROM WEBHOOK`)
-                      console.log(response.data)
-                  }
-              })
-              .catch(function (error) {
-                  console.log(error)
-              });
-          } else {
-            console.log(`-----Webhook Not Set-----\n\n`)
-          }
-          console.log(`-----WEBHOOK LOG-----\n\n`)
-          /** END WEBHOOK */
-      } catch (error) {
-          console.log(error)
-          winstonLog({tag: 'webhook', token: token, json: {
-              tag: 'manageIncomingMessage',
-              message: 'Error manage incoming message',
-              data: {
-                  token: token,
-                  upsert: upsert
-              }
-          }})
-      }
-
-      // }
+        /** START WEBHOOK */
+        const url = process.env.WEBHOOK
+        if ( url ) {
+          console.log(`Send Data To ${url}`)
+          axios.post(url, dataSend)
+            .then(function (response) {
+                if ( process.env.NODE_ENV === 'development' ) {
+                    console.log(`\n> RESPONSE FROM WEBHOOK`)
+                    console.log(response.data)
+                }
+            })
+            .catch(function (error) {
+                console.log(error)
+            });
+        } else {
+          console.log(`-----Webhook Not Set-----\n\n`)
+        }
+        console.log(`-----WEBHOOK LOG-----\n\n`)
+        /** END WEBHOOK */
+    } catch (error) {
+        console.log(error)
+        winstonLog({tag: 'webhook', token: token, json: {
+            tag: 'manageIncomingMessage',
+            message: 'Error manage incoming message',
+            data: {
+                token: token,
+                upsert: upsert
+            }
+        }})
     }
-  // }
+  }
 }
 
 module.exports = {
