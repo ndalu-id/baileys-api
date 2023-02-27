@@ -705,16 +705,101 @@ function clearConnection(token) {
   return true
 }
 
+//ADICIONADO TESTES DOCUMENTO
+async function getDocumentBase64(token, msg) {
+  // download stream
+  if ( msg.message.documentMessage ) {
+    var stream = await downloadContentFromMessage(msg.message.documentMessage, 'document')
+    var mimetype = msg.message.documentMessage.mimetype
+  }
+  let buffer = Buffer.from([])
+
+  // awaiting stream
+  for await(const chunk of stream) {
+    buffer = Buffer.concat([buffer, chunk])
+  }
+  // convert binary data to base64 encoded string
+  return `data:${mimetype};base64,${buffer.toString('base64')}`
+  // return 'data:image/png;base64,'+buffer.toString('base64');
+}
+// ADICIONADO TESTES DOCUMENTO
+
+//ADICIONADO TESTES AUDIO
+async function getAudioBase64(token, msg) {
+  // download stream
+  if ( msg.message.audioMessage ) {
+    var stream = await downloadContentFromMessage(msg.message.audioMessage, 'audio')
+    var mimetype = msg.message.audioMessage.mimetype
+  }
+  let buffer = Buffer.from([])
+
+  // awaiting stream
+  for await(const chunk of stream) {
+    buffer = Buffer.concat([buffer, chunk])
+  }
+  // convert binary data to base64 encoded string
+  return `data:${mimetype};base64,${buffer.toString('base64')}`
+  // return 'data:image/png;base64,'+buffer.toString('base64');
+}
+// ADICIONADO TESTES AUDIO
+
+
+//ADICIONADO STICKERS
+async function getStickerBase64(token, msg) {
+  // download stream
+  if ( msg.message.stickerMessage ) {
+    var stream = await downloadContentFromMessage(msg.message.stickerMessage, 'sticker')
+    var mimetype = msg.message.stickerMessage.mimetype
+  }
+  let buffer = Buffer.from([])
+
+  // awaiting stream
+  for await(const chunk of stream) {
+    buffer = Buffer.concat([buffer, chunk])
+  }
+  // convert binary data to base64 encoded string
+  return `data:${mimetype};base64,${buffer.toString('base64')}`
+  // return 'data:image/png;base64,'+buffer.toString('base64');
+}
+// ADICIONADO STICKERS
+
+
+//adicionando VIDEO BASE64
+
+async function getVideoBase64(token, msg) {
+  // download stream
+  if ( msg.message.videoMessage ) {
+    var stream = await downloadContentFromMessage(msg.message.videoMessage, 'video')
+    var mimetype = msg.message.videoMessage.mimetype
+	//if ( msg.message.videoMessage.gifPlayback ) return false
+  } 
+  
+  let buffer = Buffer.from([])
+
+  // awaiting stream
+  for await(const chunk of stream) {
+    buffer = Buffer.concat([buffer, chunk])
+  }
+  // convert binary data to base64 encoded string
+  return `data:${mimetype};base64,${buffer.toString('base64')}`
+  
+}
+
+//FIM do video base64
+
+
+
 async function getImageBase64(token, msg) {
   // download stream
   if ( msg.message.imageMessage ) {
     var stream = await downloadContentFromMessage(msg.message.imageMessage, 'image')
     var mimetype = msg.message.imageMessage.mimetype
-  } else {
-    var stream = await downloadContentFromMessage(msg.message.videoMessage, 'video')
-    var mimetype = msg.message.videoMessage.mimetype
-    if ( !msg.message.videoMessage.gifPlayback ) return false
-  }
+  } 
+  //else {
+ //   var stream = await downloadContentFromMessage(msg.message.videoMessage, 'video')
+ //   var mimetype = msg.message.videoMessage.mimetype
+ //   if ( !msg.message.videoMessage.gifPlayback ) return false
+ // }
   let buffer = Buffer.from([])
 
   // awaiting stream
@@ -790,12 +875,39 @@ async function manageIncomingMessage({token, upsert, io}) {
         var dataSend = {
             token: token,
             key: key,
-            message: message
-        }
-
-        // if ( msg?.message?.imageMessage || msg?.message?.videoMessage) {
-        //     dataSend.imageBase64 = await getImageBase64(token, msg)
-        // }
+            message: message,
+			base64: process.env.BASE64
+        
+		}
+		
+		const enviarViaBase64 = process.env.BASE64
+        if(enviarViaBase64 === 'true') // CHECA SE O BASE64 ESTÁ ATIVO "CHECK BASE64 ACTIVE"
+		 
+		 {
+         
+		 if ( msg?.message?.imageMessage) {
+             dataSend.imageBase64 = await getImageBase64(token, msg)
+         }
+		  
+		 if(msg?.message?.stickerMessage){
+			 dataSend.stickerBase64 = await getStickerBase64(token, msg)
+		 }
+		 
+		 
+		 if(msg?.message?.audioMessage){
+			 dataSend.audioBase64 = await getAudioBase64(token, msg)
+		 }
+		 
+		 
+		 if(msg?.message?.documentMessage){
+			 dataSend.documentBase64 = await getDocumentBase64(token, msg)
+		 }
+		 
+		 if(msg?.message?.videoMessage){
+			 dataSend.videoBase64 = await getVideoBase64(token, msg)
+		 }
+		 
+		 }
 
         console.log(`\n\n-----WEBHOOK LOG-----`)
         console.log({
