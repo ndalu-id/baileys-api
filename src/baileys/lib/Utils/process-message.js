@@ -1,10 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.shouldIncrementChatUnread = exports.isRealMessage = exports.cleanMessage = void 0;
+exports.decryptPollVote = exports.getChatId = exports.shouldIncrementChatUnread = exports.isRealMessage = exports.cleanMessage = void 0;
 const WAProto_1 = require("../../WAProto");
 const Types_1 = require("../Types");
-const Utils_1 = require("../Utils");
+const messages_1 = require("../Utils/messages");
 const WABinary_1 = require("../WABinary");
+const crypto_1 = require("./crypto");
+const generics_1 = require("./generics");
+const history_1 = require("./history");
 const REAL_MSG_STUB_TYPES = new Set([
     Types_1.WAMessageStubType.CALL_MISSED_GROUP_VIDEO,
     Types_1.WAMessageStubType.CALL_MISSED_GROUP_VOICE,
@@ -19,10 +22,15 @@ const cleanMessage = (message, meId) => {
     // ensure remoteJid and participant doesn't have device or agent in it
     message.key.remoteJid = (0, WABinary_1.jidNormalizedUser)(message.key.remoteJid);
     message.key.participant = message.key.participant ? (0, WABinary_1.jidNormalizedUser)(message.key.participant) : undefined;
-    const content = (0, Utils_1.normalizeMessageContent)(message.message);
+    const content = (0, messages_1.normalizeMessageContent)(message.message);
     // if the message has a reaction, ensure fromMe & remoteJid are from our perspective
     if (content === null || content === void 0 ? void 0 : content.reactionMessage) {
-        const msgKey = content.reactionMessage.key;
+        normaliseKey(content.reactionMessage.key);
+    }
+    if (content === null || content === void 0 ? void 0 : content.pollUpdateMessage) {
+        normaliseKey(content.pollUpdateMessage.pollCreationMessageKey);
+    }
+    function normaliseKey(msgKey) {
         // if the reaction is from another user
         // we've to correctly map the key to this user's perspective
         if (!message.key.fromMe) {
@@ -43,33 +51,71 @@ const cleanMessage = (message, meId) => {
 exports.cleanMessage = cleanMessage;
 const isRealMessage = (message, meId) => {
     var _a;
-    const normalizedContent = (0, Utils_1.normalizeMessageContent)(message.message);
-    const hasSomeContent = !!(0, Utils_1.getContentType)(normalizedContent);
+    const normalizedContent = (0, messages_1.normalizeMessageContent)(message.message);
+    const hasSomeContent = !!(0, messages_1.getContentType)(normalizedContent);
     return (!!normalizedContent
         || REAL_MSG_STUB_TYPES.has(message.messageStubType)
         || (REAL_MSG_REQ_ME_STUB_TYPES.has(message.messageStubType)
             && ((_a = message.messageStubParameters) === null || _a === void 0 ? void 0 : _a.some(p => (0, WABinary_1.areJidsSameUser)(meId, p)))))
         && hasSomeContent
         && !(normalizedContent === null || normalizedContent === void 0 ? void 0 : normalizedContent.protocolMessage)
-        && !(normalizedContent === null || normalizedContent === void 0 ? void 0 : normalizedContent.reactionMessage);
+        && !(normalizedContent === null || normalizedContent === void 0 ? void 0 : normalizedContent.reactionMessage)
+        && !(normalizedContent === null || normalizedContent === void 0 ? void 0 : normalizedContent.pollUpdateMessage);
 };
 exports.isRealMessage = isRealMessage;
 const shouldIncrementChatUnread = (message) => (!message.key.fromMe && !message.messageStubType);
 exports.shouldIncrementChatUnread = shouldIncrementChatUnread;
-const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, keyStore, logger, options }) => {
-    var _a, _b, _c, _d, _e, _f, _g;
+/**
+ * Get the ID of the chat from the given key.
+ * Typically -- that'll be the remoteJid, but for broadcasts, it'll be the participant
+ */
+const getChatId = ({ remoteJid, participant, fromMe }) => {
+    if ((0, WABinary_1.isJidBroadcast)(remoteJid)
+        && !(0, WABinary_1.isJidStatusBroadcast)(remoteJid)
+        && !fromMe) {
+        return participant;
+    }
+    return remoteJid;
+};
+exports.getChatId = getChatId;
+/**
+ * Decrypt a poll vote
+ * @param vote encrypted vote
+ * @param ctx additional info about the poll required for decryption
+ * @returns list of SHA256 options
+ */
+function decryptPollVote({ encPayload, encIv }, { pollCreatorJid, pollMsgId, pollEncKey, voterJid, }) {
+    const sign = Buffer.concat([
+        toBinary(pollMsgId),
+        toBinary(pollCreatorJid),
+        toBinary(voterJid),
+        toBinary('Poll Vote'),
+        new Uint8Array([1])
+    ]);
+    const key0 = (0, crypto_1.hmacSign)(pollEncKey, new Uint8Array(32), 'sha256');
+    const decKey = (0, crypto_1.hmacSign)(sign, key0, 'sha256');
+    const aad = toBinary(`${pollMsgId}\u0000${voterJid}`);
+    const decrypted = (0, crypto_1.aesDecryptGCM)(encPayload, decKey, encIv, aad);
+    return WAProto_1.proto.Message.PollVoteMessage.decode(decrypted);
+    function toBinary(txt) {
+        return Buffer.from(txt);
+    }
+}
+exports.decryptPollVote = decryptPollVote;
+const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, keyStore, logger, options, getMessage }) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const meId = creds.me.id;
     const { accountSettings } = creds;
-    const chat = { id: (0, WABinary_1.jidNormalizedUser)(message.key.remoteJid) };
+    const chat = { id: (0, WABinary_1.jidNormalizedUser)((0, exports.getChatId)(message.key)) };
     const isRealMsg = (0, exports.isRealMessage)(message, meId);
     if (isRealMsg) {
-        chat.conversationTimestamp = (0, Utils_1.toNumber)(message.messageTimestamp);
+        chat.conversationTimestamp = (0, generics_1.toNumber)(message.messageTimestamp);
         // only increment unread count if not CIPHERTEXT and from another person
         if ((0, exports.shouldIncrementChatUnread)(message)) {
             chat.unreadCount = (chat.unreadCount || 0) + 1;
         }
     }
-    const content = (0, Utils_1.normalizeMessageContent)(message.message);
+    const content = (0, messages_1.normalizeMessageContent)(message.message);
     // unarchive chat if it's a real message, or someone reacted to our message
     // and we've the unarchive chats setting on
     if ((isRealMsg || ((_b = (_a = content === null || content === void 0 ? void 0 : content.reactionMessage) === null || _a === void 0 ? void 0 : _a.key) === null || _b === void 0 ? void 0 : _b.fromMe))
@@ -97,7 +143,7 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
                             { key: message.key, messageTimestamp: message.messageTimestamp }
                         ]
                     });
-                    const data = await (0, Utils_1.downloadAndProcessHistorySyncNotification)(histNotification, options);
+                    const data = await (0, history_1.downloadAndProcessHistorySyncNotification)(histNotification, options);
                     ev.emit('messaging-history.set', { ...data, isLatest });
                 }
                 break;
@@ -134,7 +180,7 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
                 break;
             case WAProto_1.proto.Message.ProtocolMessage.Type.EPHEMERAL_SETTING:
                 Object.assign(chat, {
-                    ephemeralSettingTimestamp: (0, Utils_1.toNumber)(message.messageTimestamp),
+                    ephemeralSettingTimestamp: (0, generics_1.toNumber)(message.messageTimestamp),
                     ephemeralExpiration: protocolMsg.ephemeralExpiration || null
                 });
                 break;
@@ -203,6 +249,45 @@ const processMessage = async (message, { shouldProcessHistoryMsg, ev, creds, key
                 const code = (_g = message.messageStubParameters) === null || _g === void 0 ? void 0 : _g[0];
                 emitGroupUpdate({ inviteCode: code });
                 break;
+        }
+    }
+    else if (content === null || content === void 0 ? void 0 : content.pollUpdateMessage) {
+        const creationMsgKey = content.pollUpdateMessage.pollCreationMessageKey;
+        // we need to fetch the poll creation message to get the poll enc key
+        const pollMsg = await getMessage(creationMsgKey);
+        if (pollMsg) {
+            const meIdNormalised = (0, WABinary_1.jidNormalizedUser)(meId);
+            const pollCreatorJid = (0, generics_1.getKeyAuthor)(creationMsgKey, meIdNormalised);
+            const voterJid = (0, generics_1.getKeyAuthor)(message.key, meIdNormalised);
+            const pollEncKey = (_h = pollMsg.messageContextInfo) === null || _h === void 0 ? void 0 : _h.messageSecret;
+            try {
+                const voteMsg = decryptPollVote(content.pollUpdateMessage.vote, {
+                    pollEncKey,
+                    pollCreatorJid,
+                    pollMsgId: creationMsgKey.id,
+                    voterJid,
+                });
+                ev.emit('messages.update', [
+                    {
+                        key: creationMsgKey,
+                        update: {
+                            pollUpdates: [
+                                {
+                                    pollUpdateMessageKey: message.key,
+                                    vote: voteMsg,
+                                    senderTimestampMs: message.messageTimestamp,
+                                }
+                            ]
+                        }
+                    }
+                ]);
+            }
+            catch (err) {
+                logger === null || logger === void 0 ? void 0 : logger.warn({ err, creationMsgKey }, 'failed to decrypt poll vote');
+            }
+        }
+        else {
+            logger === null || logger === void 0 ? void 0 : logger.warn({ creationMsgKey }, 'poll creation message not found, cannot decrypt update');
         }
     }
     if (Object.keys(chat).length > 1) {

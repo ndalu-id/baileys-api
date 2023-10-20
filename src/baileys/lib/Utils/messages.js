@@ -3,14 +3,16 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assertMediaContent = exports.downloadMediaMessage = exports.aggregateMessageKeysNotFromMe = exports.updateMessageWithReaction = exports.updateMessageWithReceipt = exports.getDevice = exports.extractMessageContent = exports.normalizeMessageContent = exports.getContentType = exports.generateWAMessage = exports.generateWAMessageFromContent = exports.generateWAMessageContent = exports.generateForwardMessageContent = exports.prepareDisappearingMessageSettingContent = exports.prepareWAMessageMedia = exports.generateLinkPreviewIfRequired = exports.extractUrlFromText = void 0;
+exports.assertMediaContent = exports.downloadMediaMessage = exports.aggregateMessageKeysNotFromMe = exports.getAggregateVotesInPollMessage = exports.updateMessageWithPollUpdate = exports.updateMessageWithReaction = exports.updateMessageWithReceipt = exports.getDevice = exports.extractMessageContent = exports.normalizeMessageContent = exports.getContentType = exports.generateWAMessage = exports.generateWAMessageFromContent = exports.generateWAMessageContent = exports.generateForwardMessageContent = exports.prepareDisappearingMessageSettingContent = exports.prepareWAMessageMedia = exports.generateLinkPreviewIfRequired = exports.extractUrlFromText = void 0;
 const boom_1 = require("@hapi/boom");
 const axios_1 = __importDefault(require("axios"));
+const crypto_1 = require("crypto");
 const fs_1 = require("fs");
 const WAProto_1 = require("../../WAProto");
 const Defaults_1 = require("../Defaults");
 const Types_1 = require("../Types");
 const WABinary_1 = require("../WABinary");
+const crypto_2 = require("./crypto");
 const generics_1 = require("./generics");
 const messages_media_1 = require("./messages-media");
 const MIMETYPE_MAP = {
@@ -96,7 +98,11 @@ const prepareWAMessageMedia = async (message, options) => {
     const requiresThumbnailComputation = (mediaType === 'image' || mediaType === 'video') &&
         (typeof uploadData['jpegThumbnail'] === 'undefined');
     const requiresOriginalForSomeProcessing = requiresDurationComputation || requiresThumbnailComputation;
-    const { mediaKey, encWriteStream, bodyPath, fileEncSha256, fileSha256, fileLength, didSaveToTmpPath } = await (0, messages_media_1.encryptedStream)(uploadData.media, options.mediaTypeOverride || mediaType, requiresOriginalForSomeProcessing);
+    const { mediaKey, encWriteStream, bodyPath, fileEncSha256, fileSha256, fileLength, didSaveToTmpPath } = await (0, messages_media_1.encryptedStream)(uploadData.media, options.mediaTypeOverride || mediaType, {
+        logger,
+        saveOriginalFileIfRequired: requiresOriginalForSomeProcessing,
+        opts: options.options
+    });
     // url safe Base64 encode the SHA256 hash of the body
     const fileEncSha256B64 = fileEncSha256.toString('base64');
     const [{ mediaUrl, directPath }] = await Promise.all([
@@ -203,6 +209,7 @@ const generateForwardMessageContent = (message, forceForward) => {
 exports.generateForwardMessageContent = generateForwardMessageContent;
 const generateWAMessageContent = async (message, options) => {
     var _a;
+    var _b;
     let m = {};
     if ('text' in message) {
         const extContent = { text: message.text };
@@ -297,6 +304,25 @@ const generateWAMessageContent = async (message, options) => {
     else if ('listReply' in message) {
         m.listResponseMessage = { ...message.listReply };
     }
+    else if ('poll' in message) {
+        (_b = message.poll).selectableCount || (_b.selectableCount = 0);
+        if (!Array.isArray(message.poll.values)) {
+            throw new boom_1.Boom('Invalid poll values', { statusCode: 400 });
+        }
+        if (message.poll.selectableCount < 0
+            || message.poll.selectableCount > message.poll.values.length) {
+            throw new boom_1.Boom(`poll.selectableCount in poll should be >= 0 and <= ${message.poll.values.length}`, { statusCode: 400 });
+        }
+        m.messageContextInfo = {
+            // encKey
+            messageSecret: message.poll.messageSecret || (0, crypto_1.randomBytes)(32),
+        };
+        m.pollCreationMessage = {
+            name: message.poll.name,
+            selectableOptionsCount: message.poll.selectableCount,
+            options: message.poll.values.map(optionName => ({ optionName })),
+        };
+    }
     else {
         m = await (0, exports.prepareWAMessageMedia)(message, options);
     }
@@ -363,13 +389,24 @@ const generateWAMessageContent = async (message, options) => {
         m[messageType].contextInfo = m[messageType] || {};
         m[messageType].contextInfo.mentionedJid = message.mentions;
     }
+    if ('edit' in message) {
+        m = {
+            protocolMessage: {
+                key: message.edit,
+                editedMessage: m,
+                type: Types_1.WAProto.Message.ProtocolMessage.Type.MESSAGE_EDIT
+            }
+        };
+    }
     return Types_1.WAProto.Message.fromObject(m);
 };
 exports.generateWAMessageContent = generateWAMessageContent;
 const generateWAMessageFromContent = (jid, message, options) => {
+    // set timestamp to now
+    // if not specified
     if (!options.timestamp) {
         options.timestamp = new Date();
-    } // set timestamp to now
+    }
     const key = Object.keys(message)[0];
     const timestamp = (0, generics_1.unixTimestampSeconds)(options.timestamp);
     const { quoted, userJid } = options;
@@ -451,14 +488,25 @@ exports.getContentType = getContentType;
  * @returns
  */
 const normalizeMessageContent = (content) => {
-    var _a, _b, _c, _d, _e, _f;
-    content = ((_c = (_b = (_a = content === null || content === void 0 ? void 0 : content.ephemeralMessage) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.viewOnceMessage) === null || _c === void 0 ? void 0 : _c.message) ||
-        ((_d = content === null || content === void 0 ? void 0 : content.ephemeralMessage) === null || _d === void 0 ? void 0 : _d.message) ||
-        ((_e = content === null || content === void 0 ? void 0 : content.viewOnceMessage) === null || _e === void 0 ? void 0 : _e.message) ||
-        ((_f = content === null || content === void 0 ? void 0 : content.documentWithCaptionMessage) === null || _f === void 0 ? void 0 : _f.message) ||
-        content ||
-        undefined;
+    if (!content) {
+        return undefined;
+    }
+    // set max iterations to prevent an infinite loop
+    for (let i = 0; i < 5; i++) {
+        const inner = getFutureProofMessage(content);
+        if (!inner) {
+            break;
+        }
+        content = inner.message;
+    }
     return content;
+    function getFutureProofMessage(message) {
+        return ((message === null || message === void 0 ? void 0 : message.ephemeralMessage)
+            || (message === null || message === void 0 ? void 0 : message.viewOnceMessage)
+            || (message === null || message === void 0 ? void 0 : message.documentWithCaptionMessage)
+            || (message === null || message === void 0 ? void 0 : message.viewOnceMessageV2)
+            || (message === null || message === void 0 ? void 0 : message.editedMessage));
+    }
 };
 exports.normalizeMessageContent = normalizeMessageContent;
 /**
@@ -524,18 +572,67 @@ const updateMessageWithReceipt = (msg, receipt) => {
     }
 };
 exports.updateMessageWithReceipt = updateMessageWithReceipt;
-const getKeyAuthor = (key) => (((key === null || key === void 0 ? void 0 : key.fromMe) ? 'me' : (key === null || key === void 0 ? void 0 : key.participant) || (key === null || key === void 0 ? void 0 : key.remoteJid)) || '');
 /** Update the message with a new reaction */
 const updateMessageWithReaction = (msg, reaction) => {
-    const authorID = getKeyAuthor(reaction.key);
+    const authorID = (0, generics_1.getKeyAuthor)(reaction.key);
     const reactions = (msg.reactions || [])
-        .filter(r => getKeyAuthor(r.key) !== authorID);
+        .filter(r => (0, generics_1.getKeyAuthor)(r.key) !== authorID);
     if (reaction.text) {
         reactions.push(reaction);
     }
     msg.reactions = reactions;
 };
 exports.updateMessageWithReaction = updateMessageWithReaction;
+/** Update the message with a new poll update */
+const updateMessageWithPollUpdate = (msg, update) => {
+    var _a, _b;
+    const authorID = (0, generics_1.getKeyAuthor)(update.pollUpdateMessageKey);
+    const reactions = (msg.pollUpdates || [])
+        .filter(r => (0, generics_1.getKeyAuthor)(r.pollUpdateMessageKey) !== authorID);
+    if ((_b = (_a = update.vote) === null || _a === void 0 ? void 0 : _a.selectedOptions) === null || _b === void 0 ? void 0 : _b.length) {
+        reactions.push(update);
+    }
+    msg.pollUpdates = reactions;
+};
+exports.updateMessageWithPollUpdate = updateMessageWithPollUpdate;
+/**
+ * Aggregates all poll updates in a poll.
+ * @param msg the poll creation message
+ * @param meId your jid
+ * @returns A list of options & their voters
+ */
+function getAggregateVotesInPollMessage({ message, pollUpdates }, meId) {
+    var _a, _b, _c;
+    const opts = ((_a = message === null || message === void 0 ? void 0 : message.pollCreationMessage) === null || _a === void 0 ? void 0 : _a.options) || ((_b = message === null || message === void 0 ? void 0 : message.pollCreationMessageV2) === null || _b === void 0 ? void 0 : _b.options) || ((_c = message === null || message === void 0 ? void 0 : message.pollCreationMessageV3) === null || _c === void 0 ? void 0 : _c.options) || [];
+    const voteHashMap = opts.reduce((acc, opt) => {
+        const hash = (0, crypto_2.sha256)(Buffer.from(opt.optionName || '')).toString();
+        acc[hash] = {
+            name: opt.optionName || '',
+            voters: []
+        };
+        return acc;
+    }, {});
+    for (const update of pollUpdates || []) {
+        const { vote } = update;
+        if (!vote) {
+            continue;
+        }
+        for (const option of vote.selectedOptions || []) {
+            const hash = option.toString();
+            let data = voteHashMap[hash];
+            if (!data) {
+                voteHashMap[hash] = {
+                    name: 'Unknown',
+                    voters: []
+                };
+                data = voteHashMap[hash];
+            }
+            voteHashMap[hash].voters.push((0, generics_1.getKeyAuthor)(update.pollUpdateMessageKey, meId));
+        }
+    }
+    return Object.values(voteHashMap);
+}
+exports.getAggregateVotesInPollMessage = getAggregateVotesInPollMessage;
 /** Given a list of message keys, aggregates them by chat & sender. Useful for sending read receipts in bulk */
 const aggregateMessageKeysNotFromMe = (keys) => {
     const keyMap = {};

@@ -17,7 +17,7 @@ export declare const decodeSyncdMutations: (msgMutations: (proto.ISyncdMutation 
     hash: Buffer;
     indexValueMap: {
         [indexMacBase64: string]: {
-            valueMac: Buffer | Uint8Array;
+            valueMac: Uint8Array | Buffer;
         };
     };
 }>;
@@ -25,7 +25,7 @@ export declare const decodeSyncdPatch: (msg: proto.ISyncdPatch, name: WAPatchNam
     hash: Buffer;
     indexValueMap: {
         [indexMacBase64: string]: {
-            valueMac: Buffer | Uint8Array;
+            valueMac: Uint8Array | Buffer;
         };
     };
 }>;
@@ -62,10 +62,10 @@ export declare const decodeSyncdSnapshot: (name: WAPatchName, snapshot: proto.IS
     state: LTHashState;
     mutationMap: ChatMutationMap;
 }>;
-export declare const decodePatches: (name: WAPatchName, syncds: proto.ISyncdPatch[], initial: LTHashState, getAppStateSyncKey: FetchAppStateSyncKey, options: AxiosRequestConfig<any>, minimumVersionNumber?: number, logger?: Logger, validateMacs?: boolean) => Promise<{
+export declare const decodePatches: (name: WAPatchName, syncds: proto.ISyncdPatch[], initial: LTHashState, getAppStateSyncKey: FetchAppStateSyncKey, options: AxiosRequestConfig<any>, minimumVersionNumber?: number | undefined, logger?: Logger<import("pino").LoggerOptions> | undefined, validateMacs?: boolean) => Promise<{
     state: LTHashState;
     mutationMap: ChatMutationMap;
 }>;
 export declare const chatModificationToAppPatch: (mod: ChatModification, jid: string) => WAPatchCreate;
-export declare const processSyncAction: (syncAction: ChatMutation, ev: BaileysEventEmitter, me: Contact, initialSyncOpts?: InitialAppStateSyncOptions, logger?: Logger) => void;
+export declare const processSyncAction: (syncAction: ChatMutation, ev: BaileysEventEmitter, me: Contact, initialSyncOpts?: InitialAppStateSyncOptions | undefined, logger?: Logger<import("pino").LoggerOptions> | undefined) => void;
 export {};

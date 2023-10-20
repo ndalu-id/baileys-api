@@ -193,8 +193,12 @@ async function getAudioDuration(buffer) {
     }
     else if (typeof buffer === 'string') {
         const rStream = (0, fs_1.createReadStream)(buffer);
-        metadata = await musicMetadata.parseStream(rStream, undefined, { duration: true });
-        rStream.close();
+        try {
+            metadata = await musicMetadata.parseStream(rStream, undefined, { duration: true });
+        }
+        finally {
+            rStream.destroy();
+        }
     }
     else {
         metadata = await musicMetadata.parseStream(buffer, undefined, { duration: true });
@@ -210,15 +214,15 @@ const toReadable = (buffer) => {
 };
 exports.toReadable = toReadable;
 const toBuffer = async (stream) => {
-    let buff = Buffer.alloc(0);
+    const chunks = [];
     for await (const chunk of stream) {
-        buff = Buffer.concat([buff, chunk]);
+        chunks.push(chunk);
     }
     stream.destroy();
-    return buff;
+    return Buffer.concat(chunks);
 };
 exports.toBuffer = toBuffer;
-const getStream = async (item) => {
+const getStream = async (item, opts) => {
     if (Buffer.isBuffer(item)) {
         return { stream: (0, exports.toReadable)(item), type: 'buffer' };
     }
@@ -226,7 +230,7 @@ const getStream = async (item) => {
         return { stream: item.stream, type: 'readable' };
     }
     if (item.url.toString().startsWith('http://') || item.url.toString().startsWith('https://')) {
-        return { stream: await (0, exports.getHttpStream)(item.url), type: 'remote' };
+        return { stream: await (0, exports.getHttpStream)(item.url, opts), type: 'remote' };
     }
     return { stream: (0, fs_1.createReadStream)(item.url), type: 'file' };
 };
@@ -270,14 +274,11 @@ const getHttpStream = async (url, options = {}) => {
     return fetched.data;
 };
 exports.getHttpStream = getHttpStream;
-const encryptedStream = async (media, mediaType, saveOriginalFileIfRequired = true, logger) => {
-    const { stream, type } = await (0, exports.getStream)(media);
+const encryptedStream = async (media, mediaType, { logger, saveOriginalFileIfRequired, opts } = {}) => {
+    const { stream, type } = await (0, exports.getStream)(media, opts);
     logger === null || logger === void 0 ? void 0 : logger.debug('fetched media stream');
     const mediaKey = Crypto.randomBytes(32);
     const { cipherKey, iv, macKey } = getMediaKeys(mediaKey, mediaType);
-    // random name
-    //const encBodyPath = join(getTmpFilesDirectory(), mediaType + generateMessageID() + '.enc')
-    // const encWriteStream = createWriteStream(encBodyPath)
     const encWriteStream = new stream_1.Readable({ read: () => { } });
     let bodyPath;
     let writeStream;
@@ -295,14 +296,16 @@ const encryptedStream = async (media, mediaType, saveOriginalFileIfRequired = tr
     let hmac = Crypto.createHmac('sha256', macKey).update(iv);
     let sha256Plain = Crypto.createHash('sha256');
     let sha256Enc = Crypto.createHash('sha256');
-    const onChunk = (buff) => {
-        sha256Enc = sha256Enc.update(buff);
-        hmac = hmac.update(buff);
-        encWriteStream.push(buff);
-    };
     try {
         for await (const data of stream) {
             fileLength += data.length;
+            if (type === 'remote'
+                && (opts === null || opts === void 0 ? void 0 : opts.maxContentLength)
+                && fileLength + data.length > opts.maxContentLength) {
+                throw new boom_1.Boom(`content length exceeded when encrypting "${type}"`, {
+                    data: { media, type }
+                });
+            }
             sha256Plain = sha256Plain.update(data);
             if (writeStream) {
                 if (!writeStream.write(data)) {
@@ -318,7 +321,7 @@ const encryptedStream = async (media, mediaType, saveOriginalFileIfRequired = tr
         const fileEncSha256 = sha256Enc.digest();
         encWriteStream.push(mac);
         encWriteStream.push(null);
-        writeStream && writeStream.end();
+        writeStream === null || writeStream === void 0 ? void 0 : writeStream.end();
         stream.destroy();
         logger === null || logger === void 0 ? void 0 : logger.debug('encrypted data successfully');
         return {
@@ -333,14 +336,28 @@ const encryptedStream = async (media, mediaType, saveOriginalFileIfRequired = tr
         };
     }
     catch (error) {
-        encWriteStream.destroy(error);
-        writeStream === null || writeStream === void 0 ? void 0 : writeStream.destroy(error);
-        aes.destroy(error);
-        hmac.destroy(error);
-        sha256Plain.destroy(error);
-        sha256Enc.destroy(error);
-        stream.destroy(error);
+        // destroy all streams with error
+        encWriteStream.destroy();
+        writeStream === null || writeStream === void 0 ? void 0 : writeStream.destroy();
+        aes.destroy();
+        hmac.destroy();
+        sha256Plain.destroy();
+        sha256Enc.destroy();
+        stream.destroy();
+        if (didSaveToTmpPath) {
+            try {
+                await fs_1.promises.unlink(bodyPath);
+            }
+            catch (err) {
+                logger === null || logger === void 0 ? void 0 : logger.error({ err }, 'failed to save to tmp path');
+            }
+        }
         throw error;
+    }
+    function onChunk(buff) {
+        sha256Enc = sha256Enc.update(buff);
+        hmac = hmac.update(buff);
+        encWriteStream.push(buff);
     }
 };
 exports.encryptedStream = encryptedStream;
@@ -560,7 +577,7 @@ const encryptMediaRetryRequest = (key, mediaKey, meId) => {
                 tag: 'rmr',
                 attrs: {
                     jid: key.remoteJid,
-                    from_me: (!!key.fromMe).toString(),
+                    'from_me': (!!key.fromMe).toString(),
                     // @ts-ignore
                     participant: key.participant || undefined
                 }

@@ -1,7 +1,13 @@
 import type { proto } from '../../WAProto';
 import type { AccountSettings } from './Auth';
 import type { BufferedEventData } from './Events';
+import type { ChatLabelAssociationActionBody } from './LabelAssociation';
+import type { MessageLabelAssociationActionBody } from './LabelAssociation';
 import type { MinimalMessage } from './Message';
+/** privacy settings in WhatsApp Web */
+export declare type WAPrivacyValue = 'all' | 'contacts' | 'contact_blacklist' | 'none';
+export declare type WAPrivacyOnlineValue = 'all' | 'match_last_seen';
+export declare type WAReadReceiptsValue = 'all' | 'none';
 /** set of statuses visible to other people; see updatePresence() in WhatsAppWeb.Send */
 export declare type WAPresence = 'unavailable' | 'available' | 'composing' | 'recording' | 'paused';
 export declare const ALL_WA_PATCH_NAMES: readonly ["critical_block", "critical_unblock_low", "regular_high", "regular_low", "regular"];
@@ -74,6 +80,14 @@ export declare type ChatModification = {
 } | {
     delete: true;
     lastMessages: LastMessageList;
+} | {
+    addChatLabel: ChatLabelAssociationActionBody;
+} | {
+    removeChatLabel: ChatLabelAssociationActionBody;
+} | {
+    addMessageLabel: MessageLabelAssociationActionBody;
+} | {
+    removeMessageLabel: MessageLabelAssociationActionBody;
 };
 export declare type InitialReceivedChatsState = {
     [jid: string]: {

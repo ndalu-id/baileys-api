@@ -3,8 +3,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.INITIAL_PREKEY_COUNT = exports.MIN_PREKEY_COUNT = exports.MEDIA_KEYS = exports.MEDIA_HKDF_KEY_MAPPING = exports.MEDIA_PATH_MAP = exports.DEFAULT_CONNECTION_CONFIG = exports.PROCESSABLE_HISTORY_TYPES = exports.WA_CERT_DETAILS = exports.URL_EXCLUDE_REGEX = exports.URL_REGEX = exports.NOISE_WA_HEADER = exports.KEY_BUNDLE_TYPE = exports.DICT_VERSION = exports.NOISE_MODE = exports.WA_DEFAULT_EPHEMERAL = exports.PHONE_CONNECTION_CB = exports.DEF_TAG_PREFIX = exports.DEF_CALLBACK_PREFIX = exports.DEFAULT_ORIGIN = exports.UNAUTHORIZED_CODES = void 0;
+exports.DEFAULT_CACHE_TTLS = exports.INITIAL_PREKEY_COUNT = exports.MIN_PREKEY_COUNT = exports.MEDIA_KEYS = exports.MEDIA_HKDF_KEY_MAPPING = exports.MEDIA_PATH_MAP = exports.DEFAULT_CONNECTION_CONFIG = exports.PROCESSABLE_HISTORY_TYPES = exports.WA_CERT_DETAILS = exports.URL_EXCLUDE_REGEX = exports.URL_REGEX = exports.NOISE_WA_HEADER = exports.KEY_BUNDLE_TYPE = exports.DICT_VERSION = exports.NOISE_MODE = exports.WA_DEFAULT_EPHEMERAL = exports.PHONE_CONNECTION_CB = exports.DEF_TAG_PREFIX = exports.DEF_CALLBACK_PREFIX = exports.DEFAULT_ORIGIN = exports.UNAUTHORIZED_CODES = void 0;
 const WAProto_1 = require("../../WAProto");
+const libsignal_1 = require("../Signal/libsignal");
 const Utils_1 = require("../Utils");
 const logger_1 = __importDefault(require("../Utils/logger"));
 const baileys_version_json_1 = require("./baileys-version.json");
@@ -57,7 +58,8 @@ exports.DEFAULT_CONNECTION_CONFIG = {
         patch: false,
         snapshot: false,
     },
-    getMessage: async () => undefined
+    getMessage: async () => undefined,
+    makeSignalRepository: libsignal_1.makeLibSignalRepository
 };
 exports.MEDIA_PATH_MAP = {
     image: '/mms/image',
@@ -91,3 +93,9 @@ exports.MEDIA_HKDF_KEY_MAPPING = {
 exports.MEDIA_KEYS = Object.keys(exports.MEDIA_PATH_MAP);
 exports.MIN_PREKEY_COUNT = 5;
 exports.INITIAL_PREKEY_COUNT = 30;
+exports.DEFAULT_CACHE_TTLS = {
+    SIGNAL_STORE: 5 * 60,
+    MSG_RETRY: 60 * 60,
+    CALL_OFFER: 5 * 60,
+    USER_DEVICES: 5 * 60, // 5 minutes
+};

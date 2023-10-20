@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import { Boom } from '@hapi/boom';
 import WebSocket from 'ws';
 import { SocketConfig } from '../Types';
 import { BinaryNode } from '../WABinary';
@@ -8,7 +9,7 @@ import { BinaryNode } from '../WABinary';
  * - listen to messages and emit events
  * - query phone connection
  */
-export declare const makeSocket: ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout, options, }: SocketConfig) => {
+export declare const makeSocket: ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout, options, makeSignalRepository }: SocketConfig) => {
     type: "md";
     ws: WebSocket;
     ev: import("../Types").BaileysEventEmitter & {
@@ -22,16 +23,17 @@ export declare const makeSocket: ({ waWebSocketUrl, connectTimeoutMs, logger, ag
         creds: import("../Types").AuthenticationCreds;
         keys: import("../Types").SignalKeyStoreWithTransaction;
     };
+    signalRepository: import("../Types").SignalRepository;
     readonly user: import("../Types").Contact | undefined;
     generateMessageTag: () => string;
-    query: (node: BinaryNode, timeoutMs?: number) => Promise<BinaryNode>;
-    waitForMessage: (msgId: string, timeoutMs?: number | undefined) => Promise<any>;
+    query: (node: BinaryNode, timeoutMs?: number | undefined) => Promise<BinaryNode>;
+    waitForMessage: <T_1>(msgId: string, timeoutMs?: number | undefined) => Promise<T_1>;
     waitForSocketOpen: () => Promise<void>;
     sendRawMessage: (data: Uint8Array | Buffer) => Promise<void>;
     sendNode: (frame: BinaryNode) => Promise<void>;
-    logout: (msg?: string) => Promise<void>;
+    logout: (msg?: string | undefined) => Promise<void>;
     end: (error: Error | undefined) => void;
-    onUnexpectedError: (error: Error, msg: string) => void;
+    onUnexpectedError: (err: Error | Boom, msg: string) => void;
     uploadPreKeys: (count?: number) => Promise<void>;
     uploadPreKeysToServerIfRequired: () => Promise<void>;
     /** Waits for the connection to WA to reach a state */

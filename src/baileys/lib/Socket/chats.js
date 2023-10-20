@@ -45,6 +45,61 @@ const makeChatsSocket = (config) => {
         }
         return privacySettings;
     };
+    /** helper function to run a privacy IQ query */
+    const privacyQuery = async (name, value) => {
+        await query({
+            tag: 'iq',
+            attrs: {
+                xmlns: 'privacy',
+                to: WABinary_1.S_WHATSAPP_NET,
+                type: 'set'
+            },
+            content: [{
+                    tag: 'privacy',
+                    attrs: {},
+                    content: [
+                        {
+                            tag: 'category',
+                            attrs: { name, value }
+                        }
+                    ]
+                }]
+        });
+    };
+    const updateLastSeenPrivacy = async (value) => {
+        await privacyQuery('last', value);
+    };
+    const updateOnlinePrivacy = async (value) => {
+        await privacyQuery('online', value);
+    };
+    const updateProfilePicturePrivacy = async (value) => {
+        await privacyQuery('profile', value);
+    };
+    const updateStatusPrivacy = async (value) => {
+        await privacyQuery('status', value);
+    };
+    const updateReadReceiptsPrivacy = async (value) => {
+        await privacyQuery('readreceipts', value);
+    };
+    const updateGroupsAddPrivacy = async (value) => {
+        await privacyQuery('groupadd', value);
+    };
+    const updateDefaultDisappearingMode = async (duration) => {
+        await query({
+            tag: 'iq',
+            attrs: {
+                xmlns: 'disappearing_mode',
+                to: WABinary_1.S_WHATSAPP_NET,
+                type: 'set'
+            },
+            content: [{
+                    tag: 'disappearing_mode',
+                    attrs: {
+                        duration: duration.toString()
+                    }
+                }]
+        });
+    };
     /** helper function to run a generic IQ query */
     const interactiveQuery = async (userNodes, queryNode) => {
         const result = await query({
@@ -85,17 +140,17 @@ const makeChatsSocket = (config) => {
         return users;
     };
     const onWhatsApp = async (...jids) => {
-        const results = await interactiveQuery([
-            {
-                tag: 'user',
-                attrs: {},
-                content: jids.map(jid => ({
+        const query = { tag: 'contact', attrs: {} };
+        const list = jids.map((jid) => ({
+            tag: 'user',
+            attrs: {},
+            content: [{
                     tag: 'contact',
                     attrs: {},
-                    content: `+${jid}`
-                }))
-            }
-        ], { tag: 'contact', attrs: {} });
+                    content: jid,
+                }],
+        }));
+        const results = await interactiveQuery(list, query);
         return results.map(user => {
             const contact = (0, WABinary_1.getBinaryNodeChild)(user, 'contact');
             return { exists: (contact === null || contact === void 0 ? void 0 : contact.attrs.type) === 'in', jid: user.attrs.jid };
@@ -128,6 +183,17 @@ const makeChatsSocket = (config) => {
                     content: img
                 }
             ]
+        });
+    };
+    /** remove the profile picture for yourself or a group */
+    const removeProfilePicture = async (jid) => {
+        await query({
+            tag: 'iq',
+            attrs: {
+                to: (0, WABinary_1.jidNormalizedUser)(jid),
+                type: 'set',
+                xmlns: 'w:profile:picture'
+            }
         });
     };
     /** update the profile status for yourself */
@@ -209,8 +275,10 @@ const makeChatsSocket = (config) => {
             const website = (0, WABinary_1.getBinaryNodeChild)(profiles, 'website');
             const email = (0, WABinary_1.getBinaryNodeChild)(profiles, 'email');
             const category = (0, WABinary_1.getBinaryNodeChild)((0, WABinary_1.getBinaryNodeChild)(profiles, 'categories'), 'category');
-            const business_hours = (0, WABinary_1.getBinaryNodeChild)(profiles, 'business_hours');
-            const business_hours_config = business_hours && (0, WABinary_1.getBinaryNodeChildren)(business_hours, 'business_hours_config');
+            const businessHours = (0, WABinary_1.getBinaryNodeChild)(profiles, 'business_hours');
+            const businessHoursConfig = businessHours
+                ? (0, WABinary_1.getBinaryNodeChildren)(businessHours, 'business_hours_config')
+                : undefined;
             const websiteStr = (_a = website === null || website === void 0 ? void 0 : website.content) === null || _a === void 0 ? void 0 : _a.toString();
             return {
                 wid: (_b = profiles.attrs) === null || _b === void 0 ? void 0 : _b.jid,
@@ -219,9 +287,9 @@ const makeChatsSocket = (config) => {
                 website: websiteStr ? [websiteStr] : [],
                 email: (_e = email === null || email === void 0 ? void 0 : email.content) === null || _e === void 0 ? void 0 : _e.toString(),
                 category: (_f = category === null || category === void 0 ? void 0 : category.content) === null || _f === void 0 ? void 0 : _f.toString(),
-                business_hours: {
-                    timezone: (_g = business_hours === null || business_hours === void 0 ? void 0 : business_hours.attrs) === null || _g === void 0 ? void 0 : _g.timezone,
-                    business_config: business_hours_config === null || business_hours_config === void 0 ? void 0 : business_hours_config.map(({ attrs }) => attrs)
+                'business_hours': {
+                    timezone: (_g = businessHours === null || businessHours === void 0 ? void 0 : businessHours.attrs) === null || _g === void 0 ? void 0 : _g.timezone,
+                    'business_config': businessHoursConfig === null || businessHoursConfig === void 0 ? void 0 : businessHoursConfig.map(({ attrs }) => attrs)
                 }
             };
         }
@@ -289,7 +357,7 @@ const makeChatsSocket = (config) => {
                             name,
                             version: state.version.toString(),
                             // return snapshot if being synced from scratch
-                            return_snapshot: (!state.version).toString()
+                            'return_snapshot': (!state.version).toString()
                         }
                     });
                 }
@@ -499,7 +567,7 @@ const makeChatsSocket = (config) => {
                                     attrs: {
                                         name,
                                         version: (state.version - 1).toString(),
-                                        return_snapshot: 'false'
+                                        'return_snapshot': 'false'
                                     },
                                     content: [
                                         {
@@ -577,6 +645,48 @@ const makeChatsSocket = (config) => {
         return appPatch(patch);
     };
     /**
+     * Adds label for the chats
+     */
+    const addChatLabel = (jid, labelId) => {
+        return chatModify({
+            addChatLabel: {
+                labelId
+            }
+        }, jid);
+    };
+    /**
+     * Removes label for the chat
+     */
+    const removeChatLabel = (jid, labelId) => {
+        return chatModify({
+            removeChatLabel: {
+                labelId
+            }
+        }, jid);
+    };
+    /**
+     * Adds label for the message
+     */
+    const addMessageLabel = (jid, messageId, labelId) => {
+        return chatModify({
+            addMessageLabel: {
+                messageId,
+                labelId
+            }
+        }, jid);
+    };
+    /**
+     * Removes label for the message
+     */
+    const removeMessageLabel = (jid, messageId, labelId) => {
+        return chatModify({
+            removeMessageLabel: {
+                messageId,
+                labelId
+            }
+        }, jid);
+    };
+    /**
      * queries need to be fired on connection open
      * help ensure parity with WA Web
      * */
@@ -626,6 +736,7 @@ const makeChatsSocket = (config) => {
                 keyStore: authState.keys,
                 logger,
                 options: config.options,
+                getMessage: config.getMessage,
             })
         ]);
         if (((_c = (_b = msg.message) === null || _b === void 0 ? void 0 : _b.protocolMessage) === null || _c === void 0 ? void 0 : _c.appStateSyncKeyShare)
@@ -700,12 +811,24 @@ const makeChatsSocket = (config) => {
         fetchBlocklist,
         fetchStatus,
         updateProfilePicture,
+        removeProfilePicture,
         updateProfileStatus,
         updateProfileName,
         updateBlockStatus,
+        updateLastSeenPrivacy,
+        updateOnlinePrivacy,
+        updateProfilePicturePrivacy,
+        updateStatusPrivacy,
+        updateReadReceiptsPrivacy,
+        updateGroupsAddPrivacy,
+        updateDefaultDisappearingMode,
         getBusinessProfile,
         resyncAppState,
-        chatModify
+        chatModify,
+        addChatLabel,
+        removeChatLabel,
+        addMessageLabel,
+        removeMessageLabel
     };
 };
 exports.makeChatsSocket = makeChatsSocket;

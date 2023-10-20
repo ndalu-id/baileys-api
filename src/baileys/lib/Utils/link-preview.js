@@ -50,7 +50,10 @@ const getUrlInfo = async (text, opts = {
         if (!text.startsWith('https://') && !text.startsWith('http://')) {
             previewLink = 'https://' + previewLink;
         }
-        const info = await getLinkPreview(previewLink, opts.fetchOpts);
+        const info = await getLinkPreview(previewLink, {
+            ...opts.fetchOpts,
+            headers: opts.fetchOpts
+        });
         if (info && 'title' in info && info.title) {
             const [image] = info.images;
             const urlInfo = {
@@ -61,7 +64,11 @@ const getUrlInfo = async (text, opts = {
                 originalThumbnailUrl: image
             };
             if (opts.uploadImage) {
-                const { imageMessage } = await (0, messages_1.prepareWAMessageMedia)({ image: { url: image } }, { upload: opts.uploadImage, mediaTypeOverride: 'thumbnail-link' });
+                const { imageMessage } = await (0, messages_1.prepareWAMessageMedia)({ image: { url: image } }, {
+                    upload: opts.uploadImage,
+                    mediaTypeOverride: 'thumbnail-link',
+                    options: opts.fetchOpts
+                });
                 urlInfo.jpegThumbnail = (imageMessage === null || imageMessage === void 0 ? void 0 : imageMessage.jpegThumbnail)
                     ? Buffer.from(imageMessage.jpegThumbnail)
                     : undefined;

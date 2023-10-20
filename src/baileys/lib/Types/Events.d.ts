@@ -5,6 +5,8 @@ import { WACallEvent } from './Call';
 import { Chat, ChatUpdate, PresenceData } from './Chat';
 import { Contact } from './Contact';
 import { GroupMetadata, ParticipantAction } from './GroupMetadata';
+import { Label } from './Label';
+import { LabelAssociation } from './LabelAssociation';
 import { MessageUpsertType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message';
 import { ConnectionState } from './State';
 export declare type BaileysEventMap = {
@@ -80,6 +82,11 @@ export declare type BaileysEventMap = {
     };
     /** Receive an update on a call, including when the call was received, rejected, accepted */
     'call': WACallEvent[];
+    'labels.edit': Label;
+    'labels.association': {
+        association: LabelAssociation;
+        type: 'add' | 'remove';
+    };
 };
 export declare type BufferedEventData = {
     historySets: {

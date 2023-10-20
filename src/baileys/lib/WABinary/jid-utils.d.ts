@@ -12,7 +12,7 @@ export declare type FullJid = JidWithDevice & {
     server: JidServer | string;
     agent?: number;
 };
-export declare const jidEncode: (user: string | number | null, server: JidServer, device?: number, agent?: number) => string;
+export declare const jidEncode: (user: string | number | null, server: JidServer, device?: number | undefined, agent?: number | undefined) => string;
 export declare const jidDecode: (jid: string | undefined) => FullJid | undefined;
 /** is the jid a user */
 export declare const areJidsSameUser: (jid1: string | undefined, jid2: string | undefined) => boolean;

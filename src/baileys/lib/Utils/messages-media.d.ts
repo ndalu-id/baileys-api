@@ -1,5 +1,4 @@
 /// <reference types="node" />
-/// <reference types="node" />
 import { Boom } from '@hapi/boom';
 import { AxiosRequestConfig } from 'axios';
 import type { Logger } from 'pino';
@@ -27,9 +26,18 @@ export declare const mediaMessageSHA256B64: (message: WAMessageContent) => strin
 export declare function getAudioDuration(buffer: Buffer | string | Readable): Promise<number | undefined>;
 export declare const toReadable: (buffer: Buffer) => Readable;
 export declare const toBuffer: (stream: Readable) => Promise<Buffer>;
-export declare const getStream: (item: WAMediaUpload) => Promise<{
-    stream: Readable;
-    type: string;
+export declare const getStream: (item: WAMediaUpload, opts?: AxiosRequestConfig<any> | undefined) => Promise<{
+    readonly stream: Readable;
+    readonly type: "buffer";
+} | {
+    readonly stream: Readable;
+    readonly type: "readable";
+} | {
+    readonly stream: Readable;
+    readonly type: "remote";
+} | {
+    readonly stream: import("fs").ReadStream;
+    readonly type: "file";
 }>;
 /** generates a thumbnail for a given media, if required */
 export declare function generateThumbnail(file: string, mediaType: 'video' | 'image', options: {
@@ -44,7 +52,12 @@ export declare function generateThumbnail(file: string, mediaType: 'video' | 'im
 export declare const getHttpStream: (url: string | URL, options?: AxiosRequestConfig & {
     isStream?: true;
 }) => Promise<Readable>;
-export declare const encryptedStream: (media: WAMediaUpload, mediaType: MediaType, saveOriginalFileIfRequired?: boolean, logger?: Logger) => Promise<{
+declare type EncryptedStreamOptions = {
+    saveOriginalFileIfRequired?: boolean;
+    logger?: Logger;
+    opts?: AxiosRequestConfig;
+};
+export declare const encryptedStream: (media: WAMediaUpload, mediaType: MediaType, { logger, saveOriginalFileIfRequired, opts }?: EncryptedStreamOptions) => Promise<{
     mediaKey: Buffer;
     encWriteStream: Readable;
     bodyPath: string | undefined;
@@ -85,3 +98,4 @@ export declare const decryptMediaRetryData: ({ ciphertext, iv }: {
     iv: Uint8Array;
 }, mediaKey: Uint8Array, msgId: string) => proto.MediaRetryNotification;
 export declare const getStatusCodeForMediaRetry: (code: number) => any;
+export {};

@@ -25,6 +25,7 @@ __exportStar(require("./Socket"), exports);
 __exportStar(require("./Events"), exports);
 __exportStar(require("./Product"), exports);
 __exportStar(require("./Call"), exports);
+__exportStar(require("./Signal"), exports);
 var DisconnectReason;
 (function (DisconnectReason) {
     DisconnectReason[DisconnectReason["connectionClosed"] = 428] = "connectionClosed";

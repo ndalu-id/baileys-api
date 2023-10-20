@@ -1,3 +1,4 @@
+import { AxiosRequestConfig } from 'axios';
 import { Logger } from 'pino';
 import { WAMediaUploadFunction, WAUrlInfo } from '../Types';
 export declare type URLGenerationOptions = {
@@ -6,9 +7,7 @@ export declare type URLGenerationOptions = {
         /** Timeout in ms */
         timeout: number;
         proxyUrl?: string;
-        headers?: {
-            [key: string]: string;
-        };
+        headers?: AxiosRequestConfig<{}>['headers'];
     };
     uploadImage?: WAMediaUploadFunction;
     logger?: Logger;

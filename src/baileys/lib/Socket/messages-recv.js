@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.makeMessagesRecvSocket = void 0;
+const node_cache_1 = __importDefault(require("node-cache"));
 const WAProto_1 = require("../../WAProto");
 const Defaults_1 = require("../Defaults");
 const Types_1 = require("../Types");
@@ -13,11 +17,17 @@ const messages_send_1 = require("./messages-send");
 const makeMessagesRecvSocket = (config) => {
     const { logger, retryRequestDelayMs, getMessage, shouldIgnoreJid } = config;
     const sock = (0, messages_send_1.makeMessagesSocket)(config);
-    const { ev, authState, ws, query, processingMutex, upsertMessage, resyncAppState, onUnexpectedError, assertSessions, sendNode, relayMessage, sendReceipt, uploadPreKeys, } = sock;
+    const { ev, authState, ws, processingMutex, signalRepository, query, upsertMessage, resyncAppState, onUnexpectedError, assertSessions, sendNode, relayMessage, sendReceipt, uploadPreKeys, } = sock;
     /** this mutex ensures that each retryRequest will wait for the previous one to finish */
     const retryMutex = (0, make_mutex_1.makeMutex)();
-    const msgRetryMap = config.msgRetryCounterMap || {};
-    const callOfferData = {};
+    const msgRetryCache = config.msgRetryCounterCache || new node_cache_1.default({
+        stdTTL: Defaults_1.DEFAULT_CACHE_TTLS.MSG_RETRY,
+        useClones: false
+    });
+    const callOfferCache = config.callOfferCache || new node_cache_1.default({
+        stdTTL: Defaults_1.DEFAULT_CACHE_TTLS.CALL_OFFER,
+        useClones: false
+    });
     let sendActiveReceipts = false;
     const sendMessageAck = async ({ tag, attrs }) => {
         const stanza = {
@@ -61,14 +71,14 @@ const makeMessagesRecvSocket = (config) => {
     };
     const sendRetryRequest = async (node, forceIncludeKeys = false) => {
         const msgId = node.attrs.id;
-        let retryCount = msgRetryMap[msgId] || 0;
+        let retryCount = msgRetryCache.get(msgId) || 0;
         if (retryCount >= 5) {
             logger.debug({ retryCount, msgId }, 'reached retry limit, clearing');
-            delete msgRetryMap[msgId];
+            msgRetryCache.del(msgId);
             return;
         }
         retryCount += 1;
-        msgRetryMap[msgId] = retryCount;
+        msgRetryCache.set(msgId, retryCount);
         const { account, signedPreKey, signedIdentityKey: identityKey } = authState.creds;
         const deviceIdentity = (0, Utils_1.encodeSignedDeviceIdentity)(account, true);
         await authState.keys.transaction(async () => {
@@ -293,12 +303,13 @@ const makeMessagesRecvSocket = (config) => {
     };
     const willSendMessageAgain = (id, participant) => {
         const key = `${id}:${participant}`;
-        const retryCount = msgRetryMap[key] || 0;
+        const retryCount = msgRetryCache.get(key) || 0;
         return retryCount < 5;
     };
     const updateSendMessageAgainCount = (id, participant) => {
         const key = `${id}:${participant}`;
-        msgRetryMap[key] = (msgRetryMap[key] || 0) + 1;
+        const newValue = (msgRetryCache.get(key) || 0) + 1;
+        msgRetryCache.set(key, newValue);
     };
     const sendMessagesAgain = async (key, ids, retryNode) => {
         var _a;
@@ -441,7 +452,7 @@ const makeMessagesRecvSocket = (config) => {
         ]);
     };
     const handleMessage = async (node) => {
-        const { fullMessage: msg, category, author, decrypt } = (0, Utils_1.decodeMessageStanza)(node, authState);
+        const { fullMessage: msg, category, author, decrypt } = (0, Utils_1.decryptMessageNode)(node, authState.creds.me.id, signalRepository, logger);
         if (shouldIgnoreJid(msg.key.remoteJid)) {
             logger.debug({ key: msg.key }, 'ignored message');
             await sendMessageAck(node);
@@ -452,7 +463,6 @@ const makeMessagesRecvSocket = (config) => {
                 await decrypt();
                 // message failed to decrypt
                 if (msg.messageStubType === WAProto_1.proto.WebMessageInfo.StubType.CIPHERTEXT) {
-                    logger.error({ key: msg.key, params: msg.messageStubParameters }, 'failure in decrypting message');
                     retryMutex.mutex(async () => {
                         if (ws.readyState === ws.OPEN) {
                             const encNode = (0, WABinary_1.getBinaryNodeChild)(node, 'enc');
@@ -514,27 +524,28 @@ const makeMessagesRecvSocket = (config) => {
         if (status === 'offer') {
             call.isVideo = !!(0, WABinary_1.getBinaryNodeChild)(infoChild, 'video');
             call.isGroup = infoChild.attrs.type === 'group';
-            callOfferData[call.id] = call;
+            callOfferCache.set(call.id, call);
         }
+        const existingCall = callOfferCache.get(call.id);
         // use existing call info to populate this event
-        if (callOfferData[call.id]) {
-            call.isVideo = callOfferData[call.id].isVideo;
-            call.isGroup = callOfferData[call.id].isGroup;
+        if (existingCall) {
+            call.isVideo = existingCall.isVideo;
+            call.isGroup = existingCall.isGroup;
         }
         // delete data once call has ended
         if (status === 'reject' || status === 'accept' || status === 'timeout') {
-            delete callOfferData[call.id];
+            callOfferCache.del(call.id);
         }
         ev.emit('call', [call]);
         await sendMessageAck(node);
     };
     const handleBadAck = async ({ attrs }) => {
+        const key = { remoteJid: attrs.from, fromMe: true, id: attrs.id };
         // current hypothesis is that if pash is sent in the ack
         // it means -- the message hasn't reached all devices yet
         // we'll retry sending the message here
         if (attrs.phash) {
             logger.info({ attrs }, 'received phash in ack, resending message...');
-            const key = { remoteJid: attrs.from, fromMe: true, id: attrs.id };
             const msg = await getMessage(key);
             if (msg) {
                 await relayMessage(key.remoteJid, msg, { messageId: key.id, useUserDevicesCache: false });
@@ -542,6 +553,22 @@ const makeMessagesRecvSocket = (config) => {
             else {
                 logger.warn({ attrs }, 'could not send message again, as it was not found');
             }
+        }
+        // error in acknowledgement,
+        // device could not display the message
+        if (attrs.error) {
+            logger.warn({ attrs }, 'received error in ack');
+            ev.emit('messages.update', [
+                {
+                    key,
+                    update: {
+                        status: Types_1.WAMessageStatus.ERROR,
+                        messageStubParameters: [
+                            attrs.error
+                        ]
+                    }
+                }
+            ]);
         }
     };
     /// processes a node with the given function

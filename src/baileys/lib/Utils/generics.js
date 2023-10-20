@@ -26,7 +26,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.trimUndefineds = exports.isWABusinessPlatform = exports.getCodeFromWSError = exports.getCallStatusFromNode = exports.getErrorCodeFromStreamError = exports.getStatusFromReceiptType = exports.generateMdTagPrefix = exports.fetchLatestWaWebVersion = exports.fetchLatestBaileysVersion = exports.printQRIfNecessaryListener = exports.bindWaitForConnectionUpdate = exports.bindWaitForEvent = exports.generateMessageID = exports.promiseTimeout = exports.delayCancellable = exports.delay = exports.debouncedTimeout = exports.unixTimestampSeconds = exports.toNumber = exports.encodeBigEndian = exports.generateRegistrationId = exports.encodeWAMessage = exports.unpadRandomMax16 = exports.writeRandomPadMax16 = exports.BufferJSON = exports.Browsers = void 0;
+exports.trimUndefineds = exports.isWABusinessPlatform = exports.getCodeFromWSError = exports.getCallStatusFromNode = exports.getErrorCodeFromStreamError = exports.getStatusFromReceiptType = exports.generateMdTagPrefix = exports.fetchLatestWaWebVersion = exports.fetchLatestBaileysVersion = exports.printQRIfNecessaryListener = exports.bindWaitForConnectionUpdate = exports.bindWaitForEvent = exports.generateMessageID = exports.promiseTimeout = exports.delayCancellable = exports.delay = exports.debouncedTimeout = exports.unixTimestampSeconds = exports.toNumber = exports.encodeBigEndian = exports.generateRegistrationId = exports.encodeWAMessage = exports.unpadRandomMax16 = exports.writeRandomPadMax16 = exports.getKeyAuthor = exports.BufferJSON = exports.Browsers = void 0;
 const boom_1 = require("@hapi/boom");
 const axios_1 = __importDefault(require("axios"));
 const crypto_1 = require("crypto");
@@ -63,6 +63,8 @@ exports.BufferJSON = {
         return value;
     }
 };
+const getKeyAuthor = (key, meId = 'me') => (((key === null || key === void 0 ? void 0 : key.fromMe) ? meId : (key === null || key === void 0 ? void 0 : key.participant) || (key === null || key === void 0 ? void 0 : key.remoteJid)) || '');
+exports.getKeyAuthor = getKeyAuthor;
 const writeRandomPadMax16 = (msg) => {
     const pad = (0, crypto_1.randomBytes)(1);
     pad[0] &= 0xf;
@@ -214,7 +216,7 @@ exports.printQRIfNecessaryListener = printQRIfNecessaryListener;
  * Use to ensure your WA connection is always on the latest version
  */
 const fetchLatestBaileysVersion = async (options = {}) => {
-    const URL = 'https://raw.githubusercontent.com/adiwajshing/Baileys/master/src/Defaults/baileys-version.json';
+    const URL = 'https://raw.githubusercontent.com/WhiskeySockets/Baileys/master/src/Defaults/baileys-version.json';
     try {
         const result = await axios_1.default.get(URL, {
             ...options,
@@ -332,7 +334,7 @@ const getCallStatusFromNode = ({ tag, attrs }) => {
 exports.getCallStatusFromNode = getCallStatusFromNode;
 const UNEXPECTED_SERVER_CODE_TEXT = 'Unexpected server response: ';
 const getCodeFromWSError = (error) => {
-    var _a;
+    var _a, _b;
     let statusCode = 500;
     if (error.message.includes(UNEXPECTED_SERVER_CODE_TEXT)) {
         const code = +error.message.slice(UNEXPECTED_SERVER_CODE_TEXT.length);
@@ -340,7 +342,8 @@ const getCodeFromWSError = (error) => {
             statusCode = code;
         }
     }
-    else if ((_a = error.code) === null || _a === void 0 ? void 0 : _a.startsWith('E')) { // handle ETIMEOUT, ENOTFOUND etc
+    else if (((_a = error.code) === null || _a === void 0 ? void 0 : _a.startsWith('E'))
+        || ((_b = error === null || error === void 0 ? void 0 : error.message) === null || _b === void 0 ? void 0 : _b.includes('timed out'))) { // handle ETIMEOUT, ENOTFOUND etc
         statusCode = 408;
     }
     return statusCode;

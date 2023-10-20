@@ -19,7 +19,7 @@ const WABinary_1 = require("../WABinary");
  * - listen to messages and emit events
  * - query phone connection
  */
-const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout, options, }) => {
+const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAliveIntervalMs, version, browser, auth: authState, printQRInTerminal, defaultQueryTimeoutMs, syncFullHistory, transactionOpts, qrTimeout, options, makeSignalRepository }) => {
     const ws = new ws_1.default(waWebSocketUrl, undefined, {
         origin: Defaults_1.DEFAULT_ORIGIN,
         headers: options.headers,
@@ -36,6 +36,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
     const { creds } = authState;
     // add transaction capability
     const keys = (0, Utils_1.addTransactionCapability)(authState.keys, logger, transactionOpts);
+    const signalRepository = makeSignalRepository({ creds, keys });
     let lastDateRecv;
     let epoch = 1;
     let keepAliveReq;
@@ -50,7 +51,15 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
             throw new boom_1.Boom('Connection Closed', { statusCode: Types_1.DisconnectReason.connectionClosed });
         }
         const bytes = noise.encodeFrame(data);
-        await sendPromise.call(ws, bytes);
+        await (0, Utils_1.promiseTimeout)(connectTimeoutMs, async (resolve, reject) => {
+            try {
+                await sendPromise.call(ws, bytes);
+                resolve();
+            }
+            catch (error) {
+                reject(error);
+            }
+        });
     };
     /** send a binary node */
     const sendNode = (frame) => {
@@ -61,19 +70,21 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
         return sendRawMessage(buff);
     };
     /** log & process any unexpected errors */
-    const onUnexpectedError = (error, msg) => {
-        logger.error({ trace: error.stack, output: error.output }, `unexpected error in '${msg}'`);
+    const onUnexpectedError = (err, msg) => {
+        logger.error({ err }, `unexpected error in '${msg}'`);
     };
     /** await the next incoming message */
     const awaitNextMessage = async (sendMsg) => {
         if (ws.readyState !== ws.OPEN) {
-            throw new boom_1.Boom('Connection Closed', { statusCode: Types_1.DisconnectReason.connectionClosed });
+            throw new boom_1.Boom('Connection Closed', {
+                statusCode: Types_1.DisconnectReason.connectionClosed
+            });
         }
         let onOpen;
         let onClose;
         const result = (0, Utils_1.promiseTimeout)(connectTimeoutMs, (resolve, reject) => {
-            onOpen = (data) => resolve(data);
-            onClose = reject;
+            onOpen = resolve;
+            onClose = mapWebSocketError(reject);
             ws.on('frame', onOpen);
             ws.on('close', onClose);
             ws.on('error', onClose);
@@ -265,7 +276,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
         let onClose;
         await new Promise((resolve, reject) => {
             onOpen = () => resolve(undefined);
-            onClose = reject;
+            onClose = mapWebSocketError(reject);
             ws.on('open', onOpen);
             ws.on('close', onClose);
             ws.on('error', onClose);
@@ -356,7 +367,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
             end(err);
         }
     });
-    ws.on('error', error => end(new boom_1.Boom(`WebSocket Error (${error.message})`, { statusCode: (0, Utils_1.getCodeFromWSError)(error), data: error })));
+    ws.on('error', mapWebSocketError(end));
     ws.on('close', () => end(new boom_1.Boom('Connection Terminated', { statusCode: Types_1.DisconnectReason.connectionClosed })));
     // the server terminated the connection
     ws.on('CB:xmlstreamend', () => end(new boom_1.Boom('Connection Terminated by Server', { statusCode: Types_1.DisconnectReason.connectionClosed })));
@@ -478,6 +489,7 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
         ws,
         ev,
         authState: { creds, keys },
+        signalRepository,
         get user() {
             return authState.creds.me;
         },
@@ -497,3 +509,12 @@ const makeSocket = ({ waWebSocketUrl, connectTimeoutMs, logger, agent, keepAlive
     };
 };
 exports.makeSocket = makeSocket;
+/**
+ * map the websocket error to the right type
+ * so it can be retried by the caller
+ * */
+function mapWebSocketError(handler) {
+    return (error) => {
+        handler(new boom_1.Boom(`WebSocket Error (${error.message})`, { statusCode: (0, Utils_1.getCodeFromWSError)(error), data: error }));
+    };
+}

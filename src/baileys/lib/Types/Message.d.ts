@@ -1,13 +1,12 @@
 /// <reference types="node" />
-/// <reference types="node" />
-/// <reference types="node" />
-import type NodeCache from 'node-cache';
+import { AxiosRequestConfig } from 'axios';
 import type { Logger } from 'pino';
 import type { Readable } from 'stream';
 import type { URL } from 'url';
 import { proto } from '../../WAProto';
 import { MEDIA_HKDF_KEY_MAPPING } from '../Defaults';
 import type { GroupMetadata } from './GroupMetadata';
+import { CacheStore } from './Socket';
 export { proto as WAProto };
 export declare type WAMessage = proto.IWebMessageInfo;
 export declare type WAMessageContent = proto.IMessage;
@@ -67,6 +66,9 @@ declare type Templatable = {
     templateButtons?: proto.IHydratedTemplateButton[];
     footer?: string;
 };
+declare type Editable = {
+    edit?: WAMessageKey;
+};
 declare type Listable = {
     /** Sections of the List */
     sections?: proto.Message.ListMessage.ISection[];
@@ -78,6 +80,13 @@ declare type Listable = {
 declare type WithDimensions = {
     width?: number;
     height?: number;
+};
+export declare type PollMessageOptions = {
+    name: string;
+    selectableCount?: number;
+    values: string[];
+    /** 32 byte message secret to encrypt poll selections */
+    messageSecret?: Uint8Array;
 };
 export declare type MediaType = keyof typeof MEDIA_HKDF_KEY_MAPPING;
 export declare type AnyMediaMessageContent = (({
@@ -105,7 +114,7 @@ export declare type AnyMediaMessageContent = (({
     caption?: string;
 } & Buttonable & Templatable)) & {
     mimetype?: string;
-};
+} & Editable;
 export declare type ButtonReplyInfo = {
     displayText: string;
     id: string;
@@ -117,7 +126,9 @@ export declare type WASendableProduct = Omit<proto.Message.ProductMessage.IProdu
 export declare type AnyRegularMessageContent = (({
     text: string;
     linkPreview?: WAUrlInfo | null;
-} & Mentionable & Buttonable & Templatable & Listable) | AnyMediaMessageContent | {
+} & Mentionable & Buttonable & Templatable & Listable & Editable) | AnyMediaMessageContent | ({
+    poll: PollMessageOptions;
+} & Mentionable & Buttonable & Templatable & Editable) | {
     contacts: {
         displayName?: string;
         contacts: proto.Message.IContactMessage[];
@@ -192,8 +203,9 @@ export declare type MediaGenerationOptions = {
     mediaTypeOverride?: MediaType;
     upload: WAMediaUploadFunction;
     /** cache media so it does not have to be uploaded again */
-    mediaCache?: NodeCache;
+    mediaCache?: CacheStore;
     mediaUploadTimeoutMs?: number;
+    options?: AxiosRequestConfig;
 };
 export declare type MessageContentGenerationOptions = MediaGenerationOptions & {
     getUrlInfo?: (text: string) => Promise<WAUrlInfo | undefined>;

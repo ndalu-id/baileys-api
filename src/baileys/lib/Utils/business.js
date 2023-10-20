@@ -128,7 +128,7 @@ const toProductNode = (productId, product) => {
     }
     if ('originCountryCode' in product) {
         if (typeof product.originCountryCode === 'undefined') {
-            attrs.compliance_category = 'COUNTRY_ORIGIN_EXEMPT';
+            attrs['compliance_category'] = 'COUNTRY_ORIGIN_EXEMPT';
         }
         else {
             content.push({
@@ -145,7 +145,7 @@ const toProductNode = (productId, product) => {
         }
     }
     if (typeof product.isHidden !== 'undefined') {
-        attrs.is_hidden = product.isHidden.toString();
+        attrs['is_hidden'] = product.isHidden.toString();
     }
     const node = {
         tag: 'product',

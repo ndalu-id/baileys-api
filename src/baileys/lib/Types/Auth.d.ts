@@ -10,6 +10,7 @@ export declare type SignedKeyPair = {
     keyPair: KeyPair;
     signature: Uint8Array;
     keyId: number;
+    timestampS?: number;
 };
 export declare type ProtocolAddress = {
     name: string;
@@ -57,8 +58,8 @@ export declare type AuthenticationCreds = SignalCreds & {
 };
 export declare type SignalDataTypeMap = {
     'pre-key': KeyPair;
-    'session': any;
-    'sender-key': any;
+    'session': Uint8Array;
+    'sender-key': Uint8Array;
     'sender-key-memory': {
         [jid: string]: boolean;
     };
@@ -81,7 +82,7 @@ export declare type SignalKeyStore = {
 };
 export declare type SignalKeyStoreWithTransaction = SignalKeyStore & {
     isInTransaction: () => boolean;
-    transaction(exec: () => Promise<void>): Promise<void>;
+    transaction<T>(exec: () => Promise<T>): Promise<T>;
 };
 export declare type TransactionCapabilityOptions = {
     maxCommitRetries: number;
@@ -89,7 +90,7 @@ export declare type TransactionCapabilityOptions = {
 };
 export declare type SignalAuthState = {
     creds: SignalCreds;
-    keys: SignalKeyStore;
+    keys: SignalKeyStore | SignalKeyStoreWithTransaction;
 };
 export declare type AuthenticationState = {
     creds: AuthenticationCreds;

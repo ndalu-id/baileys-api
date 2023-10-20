@@ -6,18 +6,20 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.initAuthCreds = exports.addTransactionCapability = exports.makeCacheableSignalKeyStore = void 0;
 const crypto_1 = require("crypto");
 const node_cache_1 = __importDefault(require("node-cache"));
+const Defaults_1 = require("../Defaults");
 const crypto_2 = require("./crypto");
 const generics_1 = require("./generics");
 /**
  * Adds caching capability to a SignalKeyStore
  * @param store the store to add caching to
  * @param logger to log trace events
- * @param opts NodeCache options
+ * @param _cache cache store to use
  */
-function makeCacheableSignalKeyStore(store, logger, opts) {
-    const cache = new node_cache_1.default({
-        ...opts || {},
+function makeCacheableSignalKeyStore(store, logger, _cache) {
+    const cache = _cache || new node_cache_1.default({
+        stdTTL: Defaults_1.DEFAULT_CACHE_TTLS.SIGNAL_STORE,
         useClones: false,
+        deleteOnExpire: true,
     });
     function getUniqueId(type, id) {
         return `${type}.${id}`;
@@ -75,30 +77,26 @@ exports.makeCacheableSignalKeyStore = makeCacheableSignalKeyStore;
  * @returns SignalKeyStore with transaction capability
  */
 const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetweenTriesMs }) => {
-    let inTransaction = false;
     // number of queries made to the DB during the transaction
     // only there for logging purposes
     let dbQueriesInTransaction = 0;
     let transactionCache = {};
     let mutations = {};
-    /**
-     * prefetches some data and stores in memory,
-     * useful if these data points will be used together often
-     * */
-    const prefetch = async (type, ids) => {
-        const dict = transactionCache[type];
-        const idsRequiringFetch = dict ? ids.filter(item => !(item in dict)) : ids;
-        // only fetch if there are any items to fetch
-        if (idsRequiringFetch.length) {
-            dbQueriesInTransaction += 1;
-            const result = await state.get(type, idsRequiringFetch);
-            transactionCache[type] = Object.assign(transactionCache[type] || {}, result);
-        }
-    };
+    let transactionsInProgress = 0;
     return {
         get: async (type, ids) => {
-            if (inTransaction) {
-                await prefetch(type, ids);
+            if (isInTransaction()) {
+                const dict = transactionCache[type];
+                const idsRequiringFetch = dict
+                    ? ids.filter(item => typeof dict[item] === 'undefined')
+                    : ids;
+                // only fetch if there are any items to fetch
+                if (idsRequiringFetch.length) {
+                    dbQueriesInTransaction += 1;
+                    const result = await state.get(type, idsRequiringFetch);
+                    transactionCache[type] || (transactionCache[type] = {});
+                    Object.assign(transactionCache[type], result);
+                }
                 return ids.reduce((dict, id) => {
                     var _a;
                     const value = (_a = transactionCache[type]) === null || _a === void 0 ? void 0 : _a[id];
@@ -113,7 +111,7 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
             }
         },
         set: data => {
-            if (inTransaction) {
+            if (isInTransaction()) {
                 logger.trace({ types: Object.keys(data) }, 'caching in transaction');
                 for (const key in data) {
                     transactionCache[key] = transactionCache[key] || {};
@@ -126,18 +124,17 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
                 return state.set(data);
             }
         },
-        isInTransaction: () => inTransaction,
-        transaction: async (work) => {
-            // if we're already in a transaction,
-            // just execute what needs to be executed -- no commit required
-            if (inTransaction) {
-                await work();
-            }
-            else {
+        isInTransaction,
+        async transaction(work) {
+            let result;
+            transactionsInProgress += 1;
+            if (transactionsInProgress === 1) {
                 logger.trace('entering transaction');
-                inTransaction = true;
-                try {
-                    await work();
+            }
+            try {
+                result = await work();
+                // commit if this is the outermost transaction
+                if (transactionsInProgress === 1) {
                     if (Object.keys(mutations).length) {
                         logger.trace('committing transaction');
                         // retry mechanism to ensure we've some recovery
@@ -160,15 +157,21 @@ const addTransactionCapability = (state, logger, { maxCommitRetries, delayBetwee
                         logger.trace('no mutations in transaction');
                     }
                 }
-                finally {
-                    inTransaction = false;
+            }
+            finally {
+                transactionsInProgress -= 1;
+                if (transactionsInProgress === 0) {
                     transactionCache = {};
                     mutations = {};
                     dbQueriesInTransaction = 0;
                 }
             }
+            return result;
         }
     };
+    function isInTransaction() {
+        return transactionsInProgress > 0;
+    }
 };
 exports.addTransactionCapability = addTransactionCapability;
 const initAuthCreds = () => {

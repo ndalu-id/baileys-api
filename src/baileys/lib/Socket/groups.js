@@ -238,7 +238,7 @@ const extractGroupMetadata = (result) => {
         participants: (0, WABinary_1.getBinaryNodeChildren)(group, 'participant').map(({ attrs }) => {
             return {
                 id: attrs.jid,
-                admin: attrs.type || null,
+                admin: (attrs.type || null),
             };
         }),
         ephemeralDuration: eph ? +eph : undefined

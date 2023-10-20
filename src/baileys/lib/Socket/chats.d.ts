@@ -1,7 +1,8 @@
 /// <reference types="node" />
 /// <reference types="ws" />
+import { Boom } from '@hapi/boom';
 import { proto } from '../../WAProto';
-import { ChatModification, MessageUpsertType, SocketConfig, WABusinessProfile, WAMediaUpload, WAPatchCreate, WAPresence } from '../Types';
+import { ChatModification, MessageUpsertType, SocketConfig, WABusinessProfile, WAMediaUpload, WAPatchCreate, WAPresence, WAPrivacyOnlineValue, WAPrivacyValue, WAReadReceiptsValue } from '../Types';
 import { BinaryNode } from '../WABinary';
 export declare const makeChatsSocket: (config: SocketConfig) => {
     processingMutex: {
@@ -12,9 +13,9 @@ export declare const makeChatsSocket: (config: SocketConfig) => {
     }>;
     upsertMessage: (msg: proto.IWebMessageInfo, type: MessageUpsertType) => Promise<void>;
     appPatch: (patchCreate: WAPatchCreate) => Promise<void>;
-    sendPresenceUpdate: (type: WAPresence, toJid?: string) => Promise<void>;
-    presenceSubscribe: (toJid: string, tcToken?: Buffer) => Promise<void>;
-    profilePictureUrl: (jid: string, type?: 'preview' | 'image', timeoutMs?: number) => Promise<string | undefined>;
+    sendPresenceUpdate: (type: WAPresence, toJid?: string | undefined) => Promise<void>;
+    presenceSubscribe: (toJid: string, tcToken?: Buffer | undefined) => Promise<void>;
+    profilePictureUrl: (jid: string, type?: 'preview' | 'image', timeoutMs?: number | undefined) => Promise<string | undefined>;
     onWhatsApp: (...jids: string[]) => Promise<{
         exists: boolean;
         jid: string;
@@ -25,12 +26,24 @@ export declare const makeChatsSocket: (config: SocketConfig) => {
         setAt: Date;
     } | undefined>;
     updateProfilePicture: (jid: string, content: WAMediaUpload) => Promise<void>;
+    removeProfilePicture: (jid: string) => Promise<void>;
     updateProfileStatus: (status: string) => Promise<void>;
     updateProfileName: (name: string) => Promise<void>;
     updateBlockStatus: (jid: string, action: 'block' | 'unblock') => Promise<void>;
+    updateLastSeenPrivacy: (value: WAPrivacyValue) => Promise<void>;
+    updateOnlinePrivacy: (value: WAPrivacyOnlineValue) => Promise<void>;
+    updateProfilePicturePrivacy: (value: WAPrivacyValue) => Promise<void>;
+    updateStatusPrivacy: (value: WAPrivacyValue) => Promise<void>;
+    updateReadReceiptsPrivacy: (value: WAReadReceiptsValue) => Promise<void>;
+    updateGroupsAddPrivacy: (value: WAPrivacyValue) => Promise<void>;
+    updateDefaultDisappearingMode: (duration: number) => Promise<void>;
     getBusinessProfile: (jid: string) => Promise<WABusinessProfile | void>;
     resyncAppState: (collections: readonly ("critical_block" | "critical_unblock_low" | "regular_high" | "regular_low" | "regular")[], isInitialSync: boolean) => Promise<void>;
     chatModify: (mod: ChatModification, jid: string) => Promise<void>;
+    addChatLabel: (jid: string, labelId: string) => Promise<void>;
+    removeChatLabel: (jid: string, labelId: string) => Promise<void>;
+    addMessageLabel: (jid: string, messageId: string, labelId: string) => Promise<void>;
+    removeMessageLabel: (jid: string, messageId: string, labelId: string) => Promise<void>;
     type: "md";
     ws: import("ws");
     ev: import("../Types").BaileysEventEmitter & {
@@ -44,17 +57,17 @@ export declare const makeChatsSocket: (config: SocketConfig) => {
         creds: import("../Types").AuthenticationCreds;
         keys: import("../Types").SignalKeyStoreWithTransaction;
     };
+    signalRepository: import("../Types").SignalRepository;
     user: import("../Types").Contact | undefined;
     generateMessageTag: () => string;
     query: (node: BinaryNode, timeoutMs?: number | undefined) => Promise<BinaryNode>;
-    waitForMessage: (msgId: string, timeoutMs?: number | undefined) => Promise<any>;
+    waitForMessage: <T_2>(msgId: string, timeoutMs?: number | undefined) => Promise<T_2>;
     waitForSocketOpen: () => Promise<void>;
-    sendRawMessage: (data: Buffer | Uint8Array) => Promise<void>;
+    sendRawMessage: (data: Uint8Array | Buffer) => Promise<void>;
     sendNode: (frame: BinaryNode) => Promise<void>;
-    /** sending abt props may fix QR scan fail if server expects */
     logout: (msg?: string | undefined) => Promise<void>;
     end: (error: Error | undefined) => void;
-    onUnexpectedError: (error: Error, msg: string) => void;
+    onUnexpectedError: (err: Error | Boom<any>, msg: string) => void;
     uploadPreKeys: (count?: number) => Promise<void>;
     uploadPreKeysToServerIfRequired: () => Promise<void>;
     waitForConnectionUpdate: (check: (u: Partial<import("../Types").ConnectionState>) => boolean | undefined, timeoutMs?: number | undefined) => Promise<void>;
