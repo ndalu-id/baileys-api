@@ -97,6 +97,9 @@ Update getMessage on retry sending message.
     BEFORE INSTALLATION
     Create folder named credentials
 
+    TO CLEAR YARN CACHE
+    yarn clean cache
+
     TO INSTALL
     yarn install
 
