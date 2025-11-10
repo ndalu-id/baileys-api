@@ -1,7 +1,6 @@
 'use strict'
 
 const fs = require('fs')
-const whatsapp = require('./whatsapp')
 
 const chats = async (req, res) => {
 

@@ -102,14 +102,18 @@ function autostartInstance() {
                 connect = error
             }
 
-            winston.info(`autostart - ${token[i]} - ${JSON.stringify({
-                tag: 'autostart',
-                message: 'System autostart by nDalu.id',
-                data: {
-                    token: token[i],
-                    connect: connect
-                }
-            })}`)
+            try {
+                winston.info(`autostart - ${token[i]} - ${JSON.stringify({
+                    tag: 'autostart',
+                    message: 'System autostart by nDalu.id',
+                    data: {
+                        token: token[i],
+                        connect: connect
+                    }
+                })}`)
+            } catch (error) {
+                console.log(error)
+            }
 
         }, delay)
     }
@@ -119,4 +123,4 @@ function autostartInstance() {
 // delaying app 5 second before autostart, to more eficient ram.
 setTimeout(() => {
     autostartInstance()
-}, 5000)
+}, 5_000)

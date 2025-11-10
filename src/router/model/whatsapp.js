@@ -1,9 +1,5 @@
 'use strict'
 
-// const { default: makeWASocket, makeWALegacySocket, downloadContentFromMessage } = require('@adiwajshing/baileys')
-// const { useSingleFileAuthState, makeInMemoryStore, fetchLatestBaileysVersion, AnyMessageContent, delay, MessageRetryMap, useMultiFileAuthState } = require('@adiwajshing/baileys')
-// const { DisconnectReason } = require('@adiwajshing/baileys')
-const { default: makeWASocket, makeInMemoryStore, fetchLatestBaileysVersion, useMultiFileAuthState, downloadContentFromMessage, DisconnectReason } = require('../../baileys/lib')
 const QRCode = require('qrcode')
 
 const lib = require('../../lib')
@@ -26,6 +22,17 @@ const msgRetryCounterMap = () => MessageRetryMap = { }
 
 // start a connection
 const connectToWhatsApp = async (token, io) => {
+
+  const baileys = await import('@whiskeysockets/baileys');
+
+  const { 
+    default: makeWASocket, 
+    makeInMemoryStore, 
+    fetchLatestBaileysVersion, 
+    useMultiFileAuthState, 
+    downloadContentFromMessage, 
+    DisconnectReason 
+  } = baileys;
 
     if ( typeof qrcode[token] !== 'undefined' ) {
       console.log(`> QRCODE ${token} IS READY`)
@@ -58,19 +65,6 @@ const connectToWhatsApp = async (token, io) => {
     const { version, isLatest } = await fetchLatestBaileysVersion()
     console.log(`Token: ${token} using WA v${version.join('.')}, isLatest: ${isLatest}`)
 
-    // the store maintains the data of the WA connection in memory
-    // can be written out to a file & read from it
-    // const store = makeInMemoryStore({ logger })
-    // store?.readFromFile(`credentials/${token}/multistore.js`)
-    // {"chats":[],"contacts":{},"messages":{}}
-
-    // interval
-    // intervalStore[token] = setInterval(() => {
-    //     try {
-    //         store?.writeToFile(`credentials/${token}/multistore.js`)
-    //     } catch (error) {
-    //         console.log(error)
-    //     }
     // }, 10_000)
     intervalConnCheck[token] = setInterval(async () => {
       const check = await connectToWhatsApp(token, io)
@@ -182,21 +176,6 @@ const connectToWhatsApp = async (token, io) => {
           io.emit('connection-open', {token, user: sock[token].user, ppUrl})
           delete qrcode[token]
         }
-
-        // DON't DELETE THIS FOR BACKUP
-        // if ( lastDisconnect?.error) {
-        //     if ( lastDisconnect.error.output.statusCode !== 408 || lastDisconnect.error.output.statusCode !== 515 ) {
-        //         delete qrcode[token]
-        //         connectToWhatsApp(token, io)
-        //         io.emit('message', {token: token, message: "Reconnecting"})
-        //     } else {
-        //         io.emit('message', {token: token, message: lastDisconnect.error.output.payload.message, error: lastDisconnect.error.output.payload.error})
-        //         delete qrcode[token]
-        //         await clearConnection(token)
-        //     }
-        // }
-
-        // console.log(`connection update TOKEN: ${token} ${new Date()}`, update)
 			}
 
 			// credentials updated -- save them

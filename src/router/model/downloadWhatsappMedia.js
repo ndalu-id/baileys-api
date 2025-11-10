@@ -1,10 +1,13 @@
 'use strict'
 
-const { downloadContentFromMessage } = require('../../baileys/lib')
 const logger = require('../../lib/pino')
 const fs = require('fs')
 
 const downloadWhatsappMedia = async (req, res) => {
+    const baileys = await import('@whiskeysockets/baileys');
+    const { 
+        downloadContentFromMessage
+    } = baileys;
     let { token, message } = req.body
 
     if (!token && !message) return res.status(404).end('Not Found')

@@ -3,6 +3,7 @@
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@hapi/boom": "^10.0.0",
+    "@whiskeysockets/baileys": "^6.7.21",
     "axios": "^0.27.2",
     "body-parser": "^1.20.0",
     "crypto-js": "^4.1.1",
