@@ -5,6 +5,7 @@
     DEPENDENCIES : {
         "@adiwajshing/keyed-db": "^0.2.4",
         "@hapi/boom": "^10.0.0",
+        "@whiskeysockets/baileys": "^6.7.21",
         "axios": "^0.27.2",
         "body-parser": "^1.20.0",
         "crypto-js": "^4.1.1",
@@ -39,15 +40,10 @@ Demo visit here [ndalu-wa.herokuapp.com](https://ndalu-wa.herokuapp.com/)
     Please share your log file if any error.
     Don't share your creds !!!!! Or if you trust me contact me on instagram
 
-## HEROKU
-
-[![How to deploy this app at HEROKU](https://img.youtube.com/vi/EMV7-LRyec4/0.jpg)](https://www.youtube.com/watch?v=EMV7-LRyec4 "How to deploy this app at HEROKU")
-
 ## TODO
 
-    - download media ✔️
-    - log to file every actifity (will input into database chat, will make app lighter) 🔥🔥🔥✔️✔️
-    - group API (after mysql done) 🔥🔥🔥
+    - Wait for @lid!
+    - Wait for my idle time -.-
 
 ## UPDATE
 
